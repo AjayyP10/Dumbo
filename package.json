@@ -1,4 +1,8 @@
 {
+  "scripts": {
+    "build": "npm --prefix frontend run build",
+    "dev": "npm --prefix frontend run dev"
+  },
   "devDependencies": {
     "@types/axios": "^0.9.36",
     "@types/node": "^24.9.2",
