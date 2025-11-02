@@ -85,7 +85,7 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
     ),
     "DEFAULT_THROTTLE_CLASSES": [
-        "api.throttles.UserRateThrottle",
+        "backend.api.throttles.UserRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
         "user": "100/hour",
