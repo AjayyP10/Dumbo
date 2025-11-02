@@ -6,8 +6,11 @@ set -o errexit
 # -----------------------------
 # Backend (Django) dependencies
 # -----------------------------
-# Install Python requirements
+# Upgrade pip to latest and install Python requirements
+pip install --upgrade pip setuptools wheel
 pip install -r backend/requirements.txt
+# Explicitly ensure SimpleJWT is installed (redundant if already in requirements but helps CI clarity)
+pip install "djangorestframework-simplejwt>=5.3"
 
 # -----------------------------
 # Frontend (React + Vite) build
