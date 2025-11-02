@@ -9,8 +9,9 @@ from .permissions import IsOwner
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 MODEL = "google/gemma-3-27b-it:free"
 PROMPT_TMPL = (
-    'Translate "{input_text}" to German at {level} proficiency. '
-    "Use simple vocabulary and grammar. Avoid literal translations. Make it natural for a learner."
+    'Translate "{input_text}" to German at {level} proficiency level. '
+    'Use simple vocabulary and grammar. Avoid literal translations. '
+    'Respond with ONLY the translated sentence and nothing else.'
 )
 
 class TranslateView(APIView):
@@ -38,12 +39,16 @@ class TranslateView(APIView):
         }
         llm_resp = requests.post(OPENROUTER_URL, json=payload, headers=headers, timeout=30)
         llm_resp.raise_for_status()
-        translation = llm_resp.json()["choices"][0]["message"]["content"]
+        raw_answer = llm_resp.json()["choices"][0]["message"]["content"]
+
+        # Keep only the first non-empty line so we don’t send explanations/bullets back.
+        lines = [ln.strip() for ln in raw_answer.splitlines() if ln.strip()]
+        translation = lines[0] if lines else raw_answer.strip()
 
         obj = Translation.objects.create(
             user=request.user, input_text=text, output_text=translation, level=level
         )
-        return Response(TranslationSerializer(obj).data, status=201)
+        return Response({"translation": translation}, status=201)
 
 class HistoryListView(generics.ListAPIView):
     serializer_class = TranslationSerializer
