@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getAccessToken, getRefreshToken, saveTokens, logout } from "./auth";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -6,8 +7,9 @@ export const api = axios.create({
   baseURL: `${API_URL}/api/`,
 });
 
+// Attach access token before each request
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
+  const token = getAccessToken();
   if (token) {
     config.headers = {
       ...(config.headers as Record<string, unknown>),
@@ -16,3 +18,33 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// Attempt automatic token refresh on 401 responses
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      const refresh = getRefreshToken();
+      if (!refresh) {
+        logout();
+        return Promise.reject(error);
+      }
+      try {
+        const res = await axios.post(`${API_URL}/api/token/refresh/`, { refresh });
+        const newAccess = res.data.access;
+        saveTokens(newAccess, refresh);
+        originalRequest._retry = true;
+        originalRequest.headers = {
+          ...(originalRequest.headers || {}),
+          Authorization: `Bearer ${newAccess}`,
+        };
+        return api(originalRequest);
+      } catch (refreshErr) {
+        logout();
+        return Promise.reject(refreshErr);
+      }
+    }
+    return Promise.reject(error);
+  }
+);

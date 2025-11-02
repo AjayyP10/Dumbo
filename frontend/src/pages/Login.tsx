@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api } from "../api";
-import { saveToken } from "../auth";
+import { saveTokens } from "../auth";
 import { useNavigate, Link } from "react-router-dom";
 
 export default function Login() {
@@ -11,8 +11,8 @@ export default function Login() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await api.post<{ access: string }>("token/", data);
-      saveToken(res.data.access);
+      const res = await api.post<{ access: string; refresh: string }>("token/", data);
+      saveTokens(res.data.access, res.data.refresh);
       navigate("/translate");
     } catch {
       setError("Invalid credentials");
