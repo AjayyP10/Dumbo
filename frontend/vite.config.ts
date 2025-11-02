@@ -12,7 +12,6 @@ export default defineConfig(({ mode }) => {
       watch: {
         ignored: ["**/tsconfig.json"],
       },
-    },
-    define: { "process.env": env } // enables import.meta.env
+    }
   };
 });
