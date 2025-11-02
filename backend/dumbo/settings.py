@@ -39,7 +39,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ROOT_URLCONF = "dumbo.urls"
+ROOT_URLCONF = "backend.dumbo.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -53,8 +53,8 @@ TEMPLATES = [
         ],},
     },
 ]
-WSGI_APPLICATION = "dumbo.wsgi.application"
-ASGI_APPLICATION = "dumbo.asgi.application"
+WSGI_APPLICATION = "backend.dumbo.wsgi.application"
+ASGI_APPLICATION = "backend.dumbo.asgi.application"
 
 # Database
 DATABASE_URL = os.getenv("DATABASE_URL")
