@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: dumbo-backend
+    env: python
+    region: frankfurt
+    plan: free
+    buildCommand: |
+      bash build.sh
+    startCommand: gunicorn backend.dumbo.wsgi:application
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: dumbo-db
+          property: connectionString
+      - key: SECRET_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: https://dumbo-frontend.onrender.com
+databases:
+  - name: dumbo-db
+    plan: free
+    region: Frankfurt
