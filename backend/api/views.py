@@ -15,7 +15,26 @@ PROMPT_TMPL = (
 )
 
 class TranslateView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    """Translate input text to German at a given CEFR level.
+
+    - GET: Public, returns a short help message so the browsable API doesn’t 401.
+    - POST: Requires authentication, performs the translation.
+    """
+
+    def get_permissions(self):
+        # Allow unauthenticated GET/OPTIONS so the DRF UI can render,
+        # but require auth for POST.
+        if self.request.method in ("GET", "OPTIONS"):
+            return []  # = AllowAny
+        return [permissions.IsAuthenticated()]
+
+    def get(self, request):
+        return Response(
+            {
+                "message": "Send a POST with {input_text, level} and Bearer token to receive a translation.",
+                "allowed_levels": ["A1", "A2", "B1", "B2"],
+            }
+        )
 
     def post(self, request):
         text = request.data.get("input_text", "")[:500]
