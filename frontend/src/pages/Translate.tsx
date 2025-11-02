@@ -41,8 +41,9 @@ export default function Translate() {
   };
 
   return (
-    <>
-      <h1 className="text-xl font-bold mb-4">Translate</h1>
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
+      <div className="max-w-3xl mx-auto py-10 px-4">
+        <h1 className="text-xl font-bold mb-4">Translate</h1>
       <textarea
         className="w-full p-2 border mb-2"
         rows={4}
@@ -78,6 +79,7 @@ export default function Translate() {
           </li>
         ))}
       </ul>
-    </>
+      </div>
+    </div>
   );
 }

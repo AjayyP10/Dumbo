@@ -2,8 +2,11 @@ import os, requests
 from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .models import Translation
-from .serializers import TranslationSerializer
+from django.contrib.auth import get_user_model
+from django.utils import timezone
+from rest_framework_simplejwt.views import TokenObtainPairView
+from .models import Translation, UserLoginLog
+from .serializers import TranslationSerializer, RegisterSerializer
 from .permissions import IsOwner
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -75,3 +78,11 @@ class HistoryListView(generics.ListAPIView):
 
     def get_queryset(self):
         return Translation.objects.filter(user=self.request.user)
+
+
+class RegisterView(generics.CreateAPIView):
+    """Allow anyone to create a new user account."""
+
+    queryset = get_user_model().objects.all()
+    serializer_class = RegisterSerializer
+    permission_classes = [permissions.AllowAny]
