@@ -82,7 +82,8 @@ export default function Translate() {
           {/* Input / controls */}
           <section className="lg:col-span-6">
             <textarea
-              className="w-full p-3 border rounded mb-1 h-60"
+              disabled={loading}
+              className={`w-full p-3 border rounded mb-1 h-60 transition-opacity ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder="Enter English text"
@@ -103,11 +104,8 @@ export default function Translate() {
                 disabled={loading || !text.trim()}
                 className={`px-4 py-2 rounded text-white flex items-center justify-center space-x-2 ${loading || !text.trim() ? "bg-blue-300" : "bg-blue-600 hover:bg-blue-700"}`}
               >
-                {loading ? (
-                  <SpinnerIcon />
-                ) : (
-                  "Translate"
-                )}
+                {loading && <SpinnerIcon />}
+                <span>{loading ? "Translating..." : "Translate"}</span>
               </button>
               <button
                 onClick={() => {
