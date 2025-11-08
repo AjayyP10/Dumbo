@@ -82,7 +82,7 @@ export default function Translate() {
   return (
     <>
       {loading && (
-        <div className="fixed top-0 left-0 w-full h-1 bg-blue-500 animate-pulse z-50" />
+        <div className="fixed top-0 left-0 w-0 h-1 bg-primary animate-progress z-50" />
       )}
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
         <div className="max-w-5xl mx-auto pt-16 md:pt-10 px-4 pb-10">
@@ -125,7 +125,7 @@ export default function Translate() {
               <button
                 onClick={translate}
                 disabled={loading || !text.trim()}
-                className={`px-4 py-2 rounded text-white flex items-center justify-center space-x-2 ${loading || !text.trim() ? "bg-blue-300" : "bg-blue-600 hover:bg-blue-700"}`}
+                className={`px-4 py-2 rounded-lg font-medium text-white flex items-center justify-center space-x-2 transition transform-gpu active:scale-95 shadow-card ${loading || !text.trim() ? "bg-primary-light" : "bg-primary hover:bg-primary-dark"}`}
               >
                 {loading && <SpinnerIcon />}
                 <span>{loading ? "Translating..." : "Translate"}</span>
@@ -139,7 +139,7 @@ export default function Translate() {
                   textareaRef.current?.focus();
                 }}
                 disabled={!text && !output}
-                className={`px-4 py-2 rounded border border-gray-300 ${!text && !output ? "text-gray-400" : "text-gray-700 hover:bg-gray-100"}`}
+                className={`px-4 py-2 rounded-lg border font-medium transition shadow-card ${!text && !output ? "text-gray-400 border-gray-200" : "text-accent border-accent hover:bg-accent-light hover:text-white"}`}
               >
                 Clear
               </button>
@@ -157,11 +157,11 @@ export default function Translate() {
 
           {/* Output */}
           <section>
-            <div className="border rounded p-4 bg-white shadow-sm hover:shadow-lg transition-shadow flex flex-col min-h-[15rem] max-h-[80vh]">
+            <div className="border border-gray-100 rounded-card p-4 bg-white shadow-card hover:shadow-lg transition-shadow flex flex-col min-h-[15rem] max-h-[80vh]">
               <div className="flex-1 overflow-y-auto whitespace-pre-wrap mb-3">
                 {output ? (
                   <p
-                    className="text-black font-bold cursor-pointer select-text"
+                    className="text-black font-medium cursor-pointer select-text animate-fade-in"
                     ref={outputTextRef}
                     onClick={() => {
                       if (outputTextRef.current) {
