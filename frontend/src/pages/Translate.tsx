@@ -85,15 +85,15 @@ export default function Translate() {
         <div className="fixed top-0 left-0 w-full h-1 bg-blue-500 animate-pulse z-50" />
       )}
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
-        <div className="max-w-5xl mx-auto py-10 px-4">
+        <div className="max-w-5xl mx-auto pt-16 md:pt-10 px-4 pb-10">
         <h1 className="text-xl font-bold mb-6">Translate</h1>
 
-        <div className="grid gap-6 lg:grid-cols-12">
+        <div className="grid gap-6 md:grid-cols-2">
           {/* Input / controls */}
-          <section className="lg:col-span-6">
+          <section>
             <textarea
               disabled={loading}
-              className={`w-full p-3 border rounded mb-1 h-60 transition-opacity ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
+              className={`w-full p-3 border rounded mb-1 min-h-[15rem] max-h-[80vh] resize-none overflow-y-auto transition-opacity ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => {
@@ -156,8 +156,8 @@ export default function Translate() {
           </section>
 
           {/* Output */}
-          <section className="lg:col-span-6">
-            <div className="border rounded p-4 bg-white shadow-sm hover:shadow-lg transition-shadow flex flex-col h-60">
+          <section>
+            <div className="border rounded p-4 bg-white shadow-sm hover:shadow-lg transition-shadow flex flex-col min-h-[15rem] max-h-[80vh]">
               <div className="flex-1 overflow-y-auto whitespace-pre-wrap mb-3">
                 {output ? (
                   <p
