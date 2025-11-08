@@ -17,7 +17,7 @@ pip install "djangorestframework-simplejwt>=5.3"
 # -----------------------------
 # Install Node dependencies and build the production bundle
 cd frontend
-npm ci
+npm install
 npm run build
 cd ..
 
