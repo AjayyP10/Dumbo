@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { registerSW } from 'virtual:pwa-register';
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./index.css";
 import App from "./App";
@@ -9,6 +10,11 @@ import Translate from "./pages/Translate";
 import History from "./pages/History";
 import LoginLogs from "./pages/LoginLogs";
 import { isLoggedIn } from "./auth";
+
+// Register PWA service worker (only in production)
+if (import.meta.env.PROD) {
+  registerSW({ immediate: true });
+}
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
