@@ -81,6 +81,9 @@ export default function Translate() {
 
   return (
     <>
+      <div aria-live="polite" className="sr-only" role="status">
+        {loading ? "Translating…" : ""}
+      </div>
       {loading && (
         <div className="fixed top-0 left-0 w-0 h-1 bg-primary animate-progress z-50" />
       )}
@@ -91,9 +94,14 @@ export default function Translate() {
         <div className="grid gap-6 md:grid-cols-2">
           {/* Input / controls */}
           <section>
+            <label htmlFor="sourceText" className="sr-only">
+              English text to translate
+            </label>
             <textarea
+              id="sourceText"
               disabled={loading}
-              className={`w-full p-3 border rounded mb-1 min-h-[15rem] max-h-[80vh] resize-none overflow-y-auto transition-opacity ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
+              aria-busy={loading}
+              className={`w-full p-3 border rounded mb-1 min-h-[15rem] max-h-[80vh] resize-none overflow-y-auto transition-opacity focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => {
@@ -113,8 +121,11 @@ export default function Translate() {
             />
             <p className="text-xs text-gray-500 mb-3">{text.length} characters</p>
             <div className="flex items-center space-x-2">
+              <label htmlFor="readingLevel" className="sr-only">Reading level</label>
               <select
-                className="border p-2 rounded"
+                id="readingLevel"
+                aria-label="Select reading level"
+                className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
                 value={level}
                 onChange={(e) => setLevel(e.target.value)}
               >
@@ -124,8 +135,9 @@ export default function Translate() {
               </select>
               <button
                 onClick={translate}
+                aria-label="Translate text"
                 disabled={loading || !text.trim()}
-                className={`px-4 py-2 rounded-lg font-medium text-white flex items-center justify-center space-x-2 transition transform-gpu active:scale-95 shadow-card ${loading || !text.trim() ? "bg-primary-light" : "bg-primary hover:bg-primary-dark"}`}
+                className={`px-4 py-2 rounded-lg font-medium text-white flex items-center justify-center space-x-2 transition transform-gpu active:scale-95 shadow-card focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary ${loading || !text.trim() ? "bg-primary-light" : "bg-primary hover:bg-primary-dark"}`}
               >
                 {loading && <SpinnerIcon />}
                 <span>{loading ? "Translating..." : "Translate"}</span>
@@ -138,8 +150,9 @@ export default function Translate() {
                   setError(null);
                   textareaRef.current?.focus();
                 }}
+                aria-label="Clear input and output"
                 disabled={!text && !output}
-                className={`px-4 py-2 rounded-lg border font-medium transition shadow-card ${!text && !output ? "text-gray-400 border-gray-200" : "text-accent border-accent hover:bg-accent-light hover:text-white"}`}
+                className={`px-4 py-2 rounded-lg border font-medium transition shadow-card focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent ${!text && !output ? "text-gray-400 border-gray-200" : "text-accent border-accent hover:bg-accent-light hover:text-white"}`}
               >
                 Clear
               </button>
