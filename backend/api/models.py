@@ -6,11 +6,22 @@ User = get_user_model()
 
 class Translation(models.Model):
     LEVEL_CHOICES = [(lvl, lvl) for lvl in ["A1", "A2", "B1", "B2"]]
+    LANG_CHOICES = [
+        ("en", "English"),
+        ("de", "German"),
+        ("es", "Spanish"),
+        ("fr", "French"),
+    ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="translations")
     input_text = models.TextField()  # removed max_length to allow unlimited text
     output_text = models.TextField()
-    level = models.CharField(max_length=2, choices=LEVEL_CHOICES)
+    # New language fields – default to English→German like before
+    source_lang = models.CharField(max_length=5, choices=LANG_CHOICES, default="en")
+    target_lang = models.CharField(max_length=5, choices=LANG_CHOICES, default="de")
+
+    # CEFR level is still applicable when translating *to German*; optional otherwise
+    level = models.CharField(max_length=2, choices=LEVEL_CHOICES, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

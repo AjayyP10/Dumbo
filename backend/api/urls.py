@@ -3,7 +3,13 @@ from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
-from .views import TranslateView, HistoryListView, RegisterView, LoginLogListView
+from .views import (
+    TranslateView,
+    HistoryListView,
+    RegisterView,
+    LoginLogListView,
+    ExportHistoryView,
+)
 
 urlpatterns = [
     path("token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
@@ -12,4 +18,5 @@ urlpatterns = [
     path("history/", HistoryListView.as_view(), name="history"),
     path("register/", RegisterView.as_view(), name="register"),
     path("login-logs/", LoginLogListView.as_view(), name="login_logs"),
+    path("export-history/", ExportHistoryView.as_view(), name="export_history"),
 ]

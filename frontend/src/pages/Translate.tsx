@@ -31,8 +31,35 @@ function SpinnerIcon() {
 }
 
 export default function Translate() {
+  const { t } = useTranslation();
   const [text, setText] = useState("");
   const [level, setLevel] = useState("A1");
+  const [sourceLang, setSourceLang] = useState("en");
+  const [targetLang, setTargetLang] = useState("de");
+
+  // Supported languages (code + i18n key)
+  const LANGS = [
+    { code: "en", key: "english" },
+    { code: "de", key: "german" },
+    { code: "es", key: "spanish" },
+    { code: "fr", key: "french" },
+  ] as const;
+
+  // Ensure source and target languages are never identical
+  const handleSourceChange = (code: string) => {
+    if (code === targetLang) {
+      setTargetLang(sourceLang); // swap to previous source language
+    }
+    setSourceLang(code);
+  };
+
+  const handleTargetChange = (code: string) => {
+    if (code === sourceLang) {
+      setSourceLang(targetLang); // swap to previous target language
+    }
+    setTargetLang(code);
+  };
+
   const [loading, setLoading] = useState(false);
   const [output, setOutput] = useState("");
   const [copied, setCopied] = useState(false);
@@ -74,8 +101,10 @@ export default function Translate() {
         try {
           const res = await api.post<{ translation: string }>(
             "translate/",
-            { input_text: text.trim(), level },
-            { signal: controller.signal }
+            { input_text: text.trim(), level, source_lang: sourceLang, target_lang: targetLang },
+            {
+              signal: controller.signal,
+            }
           );
           setOutput(res.data.translation);
           saveHistory({
@@ -98,7 +127,7 @@ export default function Translate() {
       clearTimeout(id);
       controller.abort();
     };
-  }, [text, level]);
+  }, [text, level, sourceLang, targetLang]);
 
 
   const translate = async () => {
@@ -113,6 +142,8 @@ export default function Translate() {
       const res = await api.post<{ translation: string }>("translate/", {
         input_text: trimmed,
         level,
+        source_lang: sourceLang,
+        target_lang: targetLang,
       });
       setOutput(res.data.translation);
       // store in history
@@ -189,19 +220,77 @@ export default function Translate() {
               ref={textareaRef}
             />
             <p className="text-xs text-gray-500 mb-3">{text.length} characters</p>
-            <div className="flex items-center space-x-2">
-              <label htmlFor="readingLevel" className="sr-only">Reading level</label>
-              <select
-                id="readingLevel"
-                aria-label="Select reading level"
-                className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
-                value={level}
-                onChange={(e) => setLevel(e.target.value)}
+
+            {/* Language selection row */}
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <div className="flex-1 min-w-[7rem]">
+                <label htmlFor="sourceLang" className="sr-only">Source language</label>
+                <select
+                  id="sourceLang"
+                  aria-label="Source language"
+                  className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
+                  value={sourceLang}
+                  onChange={(e) => handleSourceChange(e.target.value)}
+                >
+                  {LANGS.map(({ code, key }) => (
+                    <option key={code} value={code} disabled={code === targetLang}>
+                      {t(key)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Swap button */}
+              <button
+                type="button"
+                aria-label="Swap languages"
+                className="p-2 rounded-full border bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition"
+                onClick={() => {
+                  setSourceLang(targetLang);
+                  setTargetLang(sourceLang);
+                }}
               >
-                {["A1", "A2", "B1", "B2"].map((lvl) => (
-                  <option key={lvl}>{lvl}</option>
-                ))}
-              </select>
+                ↔
+              </button>
+
+              <div className="flex-1 min-w-[7rem]">
+                <label htmlFor="targetLang" className="sr-only">Target language</label>
+                <select
+                  id="targetLang"
+                  aria-label="Target language"
+                  className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
+                  value={targetLang}
+                  onChange={(e) => handleTargetChange(e.target.value)}
+                >
+                  {LANGS.map(({ code, key }) => (
+                    <option key={code} value={code} disabled={code === sourceLang}>
+                      {t(key)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Level + actions row */}
+            <div className="flex flex-wrap items-center gap-2">
+              {["de", "es", "fr"].includes(targetLang) && (
+                <div>
+                  <label htmlFor="readingLevel" className="sr-only">Reading level</label>
+                  <select
+                    id="readingLevel"
+                    aria-label="Select reading level"
+                    className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 mr-2"
+                    value={level}
+                    onChange={(e) => setLevel(e.target.value)}
+                  >
+                    {["A1", "A2", "B1", "B2"].map((lvl) => (
+                      <option key={lvl}>{lvl}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Action buttons */}
               <button
                 onClick={translate}
                 aria-label="Translate text"
@@ -209,9 +298,10 @@ export default function Translate() {
                 className={`px-4 py-2 rounded-lg font-medium text-white flex items-center justify-center space-x-2 transition transform-gpu active:scale-95 shadow-card focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary ${loading || !text.trim() ? "bg-primary-light" : "bg-primary hover:bg-primary-dark"}`}
               >
                 {loading && <SpinnerIcon />}
-                <span>{loading ? "Translating..." : "Translate"}</span>
+                <span>{loading ? t("translating") : t("translate")}</span>
               </button>
               <button
+                type="button"
                 onClick={() => {
                   setText("");
                   setOutput("");
@@ -223,12 +313,12 @@ export default function Translate() {
                 disabled={!text && !output}
                 className={`px-4 py-2 rounded-lg border font-medium transition shadow-card focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent ${!text && !output ? "text-gray-400 border-gray-200" : "text-accent border-accent hover:bg-accent-light hover:text-white"}`}
               >
-                Clear
+                {t("clear")}
               </button>
               {error && (
                 <p
                   role="alert"
-                  className="mt-2 text-sm text-red-600"
+                  className="text-sm text-red-600"
                   aria-live="assertive"
                 >
                   {error}

@@ -5,7 +5,15 @@ from .models import Translation, UserLoginLog
 class TranslationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Translation
-        fields = ["id", "input_text", "output_text", "level", "created_at"]
+        fields = [
+            "id",
+            "input_text",
+            "output_text",
+            "level",
+            "source_lang",
+            "target_lang",
+            "created_at",
+        ]
         read_only_fields = ["id", "output_text", "created_at"]
 
 class UserLoginLogSerializer(serializers.ModelSerializer):

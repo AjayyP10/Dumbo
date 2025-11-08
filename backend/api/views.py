@@ -2,6 +2,8 @@ import os, requests
 from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django.http import HttpResponse
+import csv
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -45,16 +47,35 @@ class TranslateView(APIView):
         )
 
     def post(self, request):
-        text = request.data.get("input_text", "")
-        level = request.data.get("level", "")
-        if level not in ["A1", "A2", "B1", "B2"]:
-            return Response({"error": "Invalid CEFR level"}, status=400)
+        text = request.data.get("input_text", "").strip()
+        source_lang = request.data.get("source_lang", "en")
+        target_lang = request.data.get("target_lang", "de")
+        level = request.data.get("level", "")  # optional now
 
-        # First, attempt to reuse a recent identical translation to avoid unnecessary API calls
-        # Check if we already translated this text at this level for ANY user to save an API call
-        existing = Translation.objects.filter(
-            input_text=text, level=level
-        ).order_by("-created_at").first()
+        # Validate languages
+        allowed_langs = [code for code, _ in Translation.LANG_CHOICES]
+        if source_lang not in allowed_langs or target_lang not in allowed_langs:
+            return Response({"error": "Invalid language code"}, status=400)
+
+        # If translating INTO German, level must be provided and valid
+        if target_lang == "de":
+            if level not in ["A1", "A2", "B1", "B2"]:
+                return Response({"error": "Invalid or missing CEFR level"}, status=400)
+        else:
+            # For other target languages, ignore level
+            level = ""
+
+        # Attempt to reuse recent identical translation to avoid unnecessary API calls
+        existing = (
+            Translation.objects.filter(
+                input_text=text,
+                source_lang=source_lang,
+                target_lang=target_lang,
+                level=level,
+            )
+            .order_by("-created_at")
+            .first()
+        )
         if existing:
             return Response({"translation": existing.output_text}, status=200)
 
@@ -62,14 +83,27 @@ class TranslateView(APIView):
             "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
             "Content-Type": "application/json",
         }
+
+        # Build dynamic prompt
+        if target_lang == "de" and level:
+            prompt = (
+                f'Translate the following {source_lang} text into {dict(Translation.LANG_CHOICES).get(target_lang)} '
+                f'at {level} proficiency level: "{text}". '
+                'Use simple vocabulary and grammar appropriate for that level, avoid overly literal phrasing, and preserve paragraphs. '
+                'Respond with ONLY the translated text (no additional explanations).'
+            )
+        else:
+            prompt = (
+                f'Translate the following {dict(Translation.LANG_CHOICES).get(source_lang)} text into '
+                f'{dict(Translation.LANG_CHOICES).get(target_lang)}: "{text}". '
+                'Preserve paragraph breaks and respond with ONLY the translated text.'
+            )
+
         payload = {
             "model": MODEL,
             "messages": [
                 {"role": "system", "content": "You are a helpful translator."},
-                {
-                    "role": "user",
-                    "content": PROMPT_TMPL.format(input_text=text, level=level),
-                },
+                {"role": "user", "content": prompt},
             ],
         }
         # Retry up to 3 times with exponential back-off if upstream returns 429
@@ -114,7 +148,12 @@ class TranslateView(APIView):
         translation = raw_answer.strip()
 
         Translation.objects.create(
-            user=request.user, input_text=text, output_text=translation, level=level
+            user=request.user,
+            input_text=text,
+            output_text=translation,
+            level=level,
+            source_lang=source_lang,
+            target_lang=target_lang,
         )
         return Response({"translation": translation}, status=201)
 
@@ -142,3 +181,35 @@ class LoginLogListView(generics.ListAPIView):
 
     def get_queryset(self):
         return UserLoginLog.objects.filter(user=self.request.user)
+
+
+class ExportHistoryView(APIView):
+    """Export the authenticated user's translation history as a CSV file."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        translations = Translation.objects.filter(user=request.user).order_by("-created_at")
+        # Create the HttpResponse object with CSV headers
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = 'attachment; filename="translation_history.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow([
+            "Date",
+            "Source Language",
+            "Target Language",
+            "Level",
+            "Input Text",
+            "Output Text",
+        ])
+        for t in translations:
+            writer.writerow([
+                t.created_at.isoformat(sep=" ", timespec="seconds"),
+                t.source_lang,
+                t.target_lang,
+                t.level or "-",
+                t.input_text.replace("\n", " "),
+                t.output_text.replace("\n", " "),
+            ])
+        return response
