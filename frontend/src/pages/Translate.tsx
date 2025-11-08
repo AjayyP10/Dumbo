@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { api } from "../api";
 
 function SpinnerIcon() {
@@ -34,6 +34,14 @@ export default function Translate() {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const outputTextRef = useRef<HTMLParagraphElement | null>(null);
+
+  // Auto-focus textarea on mount
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, []);
+
 
   const translate = async () => {
     const trimmed = text.trim();
@@ -49,6 +57,8 @@ export default function Translate() {
         level,
       });
       setOutput(res.data.translation);
+      // focus back to textarea for quick edits
+      setTimeout(() => textareaRef.current?.focus(), 0);
     } catch (err: any) {
       setError(
         err?.response?.data?.detail ||
@@ -86,7 +96,20 @@ export default function Translate() {
               className={`w-full p-3 border rounded mb-1 h-60 transition-opacity ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
               value={text}
               onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && e.ctrlKey) {
+                  e.preventDefault();
+                  translate();
+                } else if (e.key === "Escape") {
+                  e.preventDefault();
+                  setText("");
+                  setOutput("");
+                  setCopied(false);
+                  setError(null);
+                }
+              }}
               placeholder="Enter English text"
+              ref={textareaRef}
             />
             <p className="text-xs text-gray-500 mb-3">{text.length} characters</p>
             <div className="flex items-center space-x-2">
@@ -113,6 +136,7 @@ export default function Translate() {
                   setOutput("");
                   setCopied(false);
                   setError(null);
+                  textareaRef.current?.focus();
                 }}
                 disabled={!text && !output}
                 className={`px-4 py-2 rounded border border-gray-300 ${!text && !output ? "text-gray-400" : "text-gray-700 hover:bg-gray-100"}`}
@@ -136,7 +160,21 @@ export default function Translate() {
             <div className="border rounded p-4 bg-white shadow-sm hover:shadow-lg transition-shadow flex flex-col h-60">
               <div className="flex-1 overflow-y-auto whitespace-pre-wrap mb-3">
                 {output ? (
-                  <p className="text-black font-bold">{output}</p>
+                  <p
+                    className="text-black font-bold cursor-pointer select-text"
+                    ref={outputTextRef}
+                    onClick={() => {
+                      if (outputTextRef.current) {
+                        const range = document.createRange();
+                        range.selectNodeContents(outputTextRef.current);
+                        const sel = window.getSelection();
+                        sel?.removeAllRanges();
+                        sel?.addRange(range);
+                      }
+                    }}
+                  >
+                    {output}
+                  </p>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500">
                     <svg
