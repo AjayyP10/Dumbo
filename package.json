@@ -7,5 +7,8 @@
     "@types/axios": "^0.9.36",
     "@types/node": "^24.9.2",
     "@types/react-router-dom": "^5.3.3"
+  },
+  "dependencies": {
+    "react-hot-toast": "^2.6.0"
   }
 }

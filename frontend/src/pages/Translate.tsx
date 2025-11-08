@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { api } from "../api";
+import HistorySidebar, { type HistoryItem } from "../components/HistorySidebar";
+import axios from "axios";
+import toast from "react-hot-toast";
 
 function SpinnerIcon() {
   return (
@@ -34,6 +37,21 @@ export default function Translate() {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [history, setHistory] = useState<HistoryItem[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("translationHistory") || "[]");
+    } catch {
+      return [];
+    }
+  });
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+
+  const saveHistory = (item: HistoryItem) => {
+    const updated = [item, ...history].slice(0, 20);
+    setHistory(updated);
+    localStorage.setItem("translationHistory", JSON.stringify(updated));
+  };
+
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const outputTextRef = useRef<HTMLParagraphElement | null>(null);
 
@@ -41,6 +59,45 @@ export default function Translate() {
   useEffect(() => {
     textareaRef.current?.focus();
   }, []);
+
+  // Debounce translation
+  useEffect(() => {
+    if (!text.trim()) {
+      setOutput("");
+      return;
+    }
+    const controller = new AbortController();
+    const id = setTimeout(() => {
+      (async () => {
+        setLoading(true);
+        try {
+          const res = await api.post<{ translation: string }>(
+            "translate/",
+            { input_text: text.trim(), level },
+            { signal: controller.signal }
+          );
+          setOutput(res.data.translation);
+          saveHistory({
+            id: crypto.randomUUID(),
+            text: text.trim(),
+            level,
+            translation: res.data.translation,
+            timestamp: Date.now(),
+          });
+          toast.success("Translated!");
+        } catch (err: any) {
+          if (axios.isCancel(err)) return;
+          toast.error(err?.response?.data?.detail || "Translation failed");
+        } finally {
+          setLoading(false);
+        }
+      })();
+    }, 400);
+    return () => {
+      clearTimeout(id);
+      controller.abort();
+    };
+  }, [text, level]);
 
 
   const translate = async () => {
@@ -57,6 +114,14 @@ export default function Translate() {
         level,
       });
       setOutput(res.data.translation);
+      // store in history
+      saveHistory({
+        id: crypto.randomUUID(),
+        text: trimmed,
+        level,
+        translation: res.data.translation,
+        timestamp: Date.now(),
+      });
       // focus back to textarea for quick edits
       setTimeout(() => textareaRef.current?.focus(), 0);
     } catch (err: any) {
@@ -87,9 +152,18 @@ export default function Translate() {
       {loading && (
         <div className="fixed top-0 left-0 w-0 h-1 bg-primary animate-progress z-50" />
       )}
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-700">
         <div className="max-w-5xl mx-auto pt-16 md:pt-10 px-4 pb-10">
-        <h1 className="text-xl font-bold mb-6">Translate</h1>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Translate</h1>
+          <button
+            onClick={() => setIsHistoryOpen(true)}
+            aria-label="Open translation history"
+            className="text-primary hover:text-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+          >
+            History
+          </button>
+        </div>
 
         <div className="grid gap-6 md:grid-cols-2">
           {/* Input / controls */}
@@ -101,7 +175,7 @@ export default function Translate() {
               id="sourceText"
               disabled={loading}
               aria-busy={loading}
-              className={`w-full p-3 border rounded mb-1 min-h-[15rem] max-h-[80vh] resize-none overflow-y-auto transition-opacity focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
+              className={`w-full p-3 border rounded mb-1 min-h-[15rem] max-h-[80vh] resize-none overflow-y-auto transition-opacity focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => {
@@ -125,7 +199,7 @@ export default function Translate() {
               <select
                 id="readingLevel"
                 aria-label="Select reading level"
-                className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
                 value={level}
                 onChange={(e) => setLevel(e.target.value)}
               >
@@ -170,11 +244,17 @@ export default function Translate() {
 
           {/* Output */}
           <section>
-            <div className="border border-gray-100 rounded-card p-4 bg-white shadow-card hover:shadow-lg transition-shadow flex flex-col min-h-[15rem] max-h-[80vh]">
+            <div className="border border-gray-100 dark:border-gray-700 rounded-card p-4 bg-white dark:bg-gray-800 shadow-card hover:shadow-lg transition-shadow flex flex-col min-h-[15rem] max-h-[80vh]">
               <div className="flex-1 overflow-y-auto whitespace-pre-wrap mb-3">
-                {output ? (
+                {loading && !output ? (
+                  <div className="space-y-2 animate-pulse" aria-hidden="true">
+                    <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-3/4" />
+                    <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-5/6" />
+                    <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-2/3" />
+                  </div>
+                ) : output ? (
                   <p
-                    className="text-black font-medium cursor-pointer select-text animate-fade-in"
+                    className="text-black dark:text-gray-100 font-medium cursor-pointer select-text animate-fade-in"
                     ref={outputTextRef}
                     onClick={() => {
                       if (outputTextRef.current) {
