@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../api";
-import HistorySidebar, { type HistoryItem } from "../components/HistorySidebar";
 import axios from "axios";
 import toast from "react-hot-toast";
+import { type HistoryItem } from "../components/HistorySidebar";
 
 function SpinnerIcon() {
   return (
@@ -44,7 +45,7 @@ export default function Translate() {
       return [];
     }
   });
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+
 
   const saveHistory = (item: HistoryItem) => {
     const updated = [item, ...history].slice(0, 20);
@@ -156,13 +157,7 @@ export default function Translate() {
         <div className="max-w-5xl mx-auto pt-16 md:pt-10 px-4 pb-10">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Translate</h1>
-          <button
-            onClick={() => setIsHistoryOpen(true)}
-            aria-label="Open translation history"
-            className="text-primary hover:text-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-          >
-            History
-          </button>
+
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">

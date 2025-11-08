@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { logout, getUsername, isLoggedIn } from "../auth";
+import { useTranslation } from "react-i18next";
 
 export default function Navbar() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const [dark, setDark] = useState<boolean>(() => {
     const stored = localStorage.getItem("theme");
     if (stored) return stored === "dark";
@@ -41,12 +44,14 @@ export default function Navbar() {
         </button>
         {isLoggedIn() && (
           <>
-            <Link to="/history" className="mr-2 text-blue-600 dark:text-blue-400 hover:underline">
-              History
-            </Link>
-            <span className="mr-2 dark:text-gray-100">Hello {getUsername() ?? "User"}</span>
+            {location.pathname !== '/history' && (
+              <Link to="/history" className="mr-2 text-blue-600 dark:text-blue-400 hover:underline">
+                {t('history')}
+              </Link>
+            )}
+            <span className="mr-2 dark:text-gray-100">{t('hello', { name: getUsername() ?? 'User' })}</span>
             <button onClick={handleLogout} className="text-blue-600 dark:text-blue-400">
-              Logout
+              {t('logout')}
             </button>
           </>
         )}
