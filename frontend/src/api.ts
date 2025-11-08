@@ -33,7 +33,8 @@ api.interceptors.response.use(
       try {
         const res = await axios.post(`${API_URL}/api/token/refresh/`, { refresh });
         const newAccess = res.data.access;
-        saveTokens(newAccess, refresh);
+        const newRefresh = res.data.refresh || refresh; // use rotated token if provided
+        saveTokens(newAccess, newRefresh);
         originalRequest._retry = true;
         originalRequest.headers = {
           ...(originalRequest.headers || {}),

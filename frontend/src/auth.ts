@@ -8,19 +8,23 @@ export const saveTokens = (access: string, refresh: string) => {
 export const logout = () => {
   localStorage.removeItem("access");
   localStorage.removeItem("refresh");
+  localStorage.removeItem("username");
 };
 
 export const getAccessToken = () => localStorage.getItem("access");
 export const getRefreshToken = () => localStorage.getItem("refresh");
 export const isLoggedIn = () => Boolean(getAccessToken());
 
-export const getUser = () => {
+export const getUsername = (): string | null => {
+  const stored = localStorage.getItem("username");
+  if (stored) return stored;
+  // Fallback to decoding token if username not saved explicitly
   const token = getAccessToken();
   if (!token) return null;
   try {
     const decoded = jwtDecode<{ username?: string }>(token);
-    return decoded?.username || "User";
+    return decoded?.username || null;
   } catch {
-    return "User";
+    return null;
   }
 };

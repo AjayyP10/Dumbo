@@ -6,6 +6,8 @@ import App from "./App";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Translate from "./pages/Translate";
+import History from "./pages/History";
+import LoginLogs from "./pages/LoginLogs";
 import { isLoggedIn } from "./auth";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
@@ -15,6 +17,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Route path="/" element={<App />}>
           <Route index element={<Navigate to="/translate" />} />
           <Route path="translate" element={<Translate />} />
+          <Route path="history" element={<History />} />
+          <Route path="login-logs" element={<LoginLogs />} />
         </Route>
         <Route
           path="/login"

@@ -13,6 +13,7 @@ export default function Login() {
     try {
       const res = await api.post<{ access: string; refresh: string }>("token/", data);
       saveTokens(res.data.access, res.data.refresh);
+      localStorage.setItem("username", data.username);
       navigate("/translate");
     } catch {
       setError("Invalid credentials");

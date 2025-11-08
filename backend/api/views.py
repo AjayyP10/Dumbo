@@ -6,15 +6,20 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .models import Translation, UserLoginLog
-from .serializers import TranslationSerializer, RegisterSerializer
+from .serializers import (
+    TranslationSerializer,
+    RegisterSerializer,
+    UserLoginLogSerializer,
+)
+from .models import Translation, UserLoginLog
 from .permissions import IsOwner
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 MODEL = "google/gemma-3-27b-it:free"
 PROMPT_TMPL = (
-    'Translate "{input_text}" to German at {level} proficiency level. '
-    'Use simple vocabulary and grammar. Avoid literal translations. '
-    'Respond with ONLY the translated sentence and nothing else.'
+    'Translate the following English text into German at {level} proficiency level: "{input_text}". '
+    'Use simple vocabulary and grammar appropriate for that level, avoid overly literal phrasing, and preserve paragraphs. '
+    'Respond with ONLY the translated text (no additional explanations).'
 )
 
 class TranslateView(APIView):
@@ -40,10 +45,18 @@ class TranslateView(APIView):
         )
 
     def post(self, request):
-        text = request.data.get("input_text", "")[:500]
+        text = request.data.get("input_text", "")
         level = request.data.get("level", "")
         if level not in ["A1", "A2", "B1", "B2"]:
             return Response({"error": "Invalid CEFR level"}, status=400)
+
+        # First, attempt to reuse a recent identical translation to avoid unnecessary API calls
+        # Check if we already translated this text at this level for ANY user to save an API call
+        existing = Translation.objects.filter(
+            input_text=text, level=level
+        ).order_by("-created_at").first()
+        if existing:
+            return Response({"translation": existing.output_text}, status=200)
 
         headers = {
             "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
@@ -59,15 +72,48 @@ class TranslateView(APIView):
                 },
             ],
         }
-        llm_resp = requests.post(OPENROUTER_URL, json=payload, headers=headers, timeout=30)
-        llm_resp.raise_for_status()
+        # Retry up to 3 times with exponential back-off if upstream returns 429
+        retries = 0
+        backoff = 2  # seconds
+        while True:
+            try:
+                llm_resp = requests.post(
+                    OPENROUTER_URL, json=payload, headers=headers, timeout=30
+                )
+                if llm_resp.status_code == 429 and retries < 3:
+                    retries += 1
+                    import time
+                    time.sleep(backoff)
+                    backoff *= 2  # exponential
+                    continue
+                llm_resp.raise_for_status()
+                break  # success reached
+            except requests.exceptions.HTTPError as e:
+                if e.response is not None and e.response.status_code == 429 and retries < 3:
+                    retries += 1
+                    import time
+                    time.sleep(backoff)
+                    backoff *= 2
+                    continue
+                # Exceeded retries or different HTTP error
+                if e.response is not None and e.response.status_code == 429:
+                    return Response(
+                        {"error": "Upstream rate limit still exceeded. Please try later."},
+                        status=429,
+                    )
+                return Response({"error": str(e)}, status=e.response.status_code if e.response else 500)
+            except requests.exceptions.RequestException:
+                return Response(
+                    {"error": "Upstream translation service unavailable. Please try later."},
+                    status=503,
+                )
+
         raw_answer = llm_resp.json()["choices"][0]["message"]["content"]
 
-        # Keep only the first non-empty line so we don’t send explanations/bullets back.
-        lines = [ln.strip() for ln in raw_answer.splitlines() if ln.strip()]
-        translation = lines[0] if lines else raw_answer.strip()
+        # Use the entire translated text, preserving original paragraph breaks
+        translation = raw_answer.strip()
 
-        obj = Translation.objects.create(
+        Translation.objects.create(
             user=request.user, input_text=text, output_text=translation, level=level
         )
         return Response({"translation": translation}, status=201)
@@ -86,3 +132,13 @@ class RegisterView(generics.CreateAPIView):
     queryset = get_user_model().objects.all()
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
+
+
+class LoginLogListView(generics.ListAPIView):
+    """Return recent login attempts for the current user."""
+
+    serializer_class = UserLoginLogSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return UserLoginLog.objects.filter(user=self.request.user)
