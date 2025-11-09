@@ -10,6 +10,7 @@ import Register from "./pages/Register";
 import Translate from "./pages/Translate";
 import History from "./pages/History";
 import LoginLogs from "./pages/LoginLogs";
+import { PrivateRoute, PublicOnly } from "./RouteGuards";
 import { isLoggedIn } from "./auth";
 
 // Register PWA service worker (only in production)
@@ -21,7 +22,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<App />}>
+        <Route path="/" element={<PrivateRoute><App /></PrivateRoute>}>
           <Route index element={<Navigate to="/translate" />} />
           <Route path="translate" element={<Translate />} />
           <Route path="history" element={<History />} />
@@ -29,11 +30,11 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         </Route>
         <Route
           path="/login"
-          element={isLoggedIn() ? <Navigate to="/translate" /> : <Login />}
+          element={<PublicOnly><Login /></PublicOnly>}
         />
         <Route
           path="/register"
-          element={isLoggedIn() ? <Navigate to="/translate" /> : <Register />}
+          element={<PublicOnly><Register /></PublicOnly>}
         />
       </Routes>
     </BrowserRouter>
