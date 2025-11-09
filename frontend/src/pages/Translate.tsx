@@ -88,46 +88,7 @@ export default function Translate() {
     textareaRef.current?.focus();
   }, []);
 
-  // Debounce translation
-  useEffect(() => {
-    if (!text.trim()) {
-      setOutput("");
-      return;
-    }
-    const controller = new AbortController();
-    const id = setTimeout(() => {
-      (async () => {
-        setLoading(true);
-        try {
-          const res = await api.post<{ translation: string }>(
-            "translate/",
-            { input_text: text.trim(), level, source_lang: sourceLang, target_lang: targetLang },
-            {
-              signal: controller.signal,
-            }
-          );
-          setOutput(res.data.translation);
-          saveHistory({
-            id: crypto.randomUUID(),
-            text: text.trim(),
-            level,
-            translation: res.data.translation,
-            timestamp: Date.now(),
-          });
-          toast.success("Translated!");
-        } catch (err: any) {
-          if (axios.isCancel(err)) return;
-          toast.error(err?.response?.data?.detail || "Translation failed");
-        } finally {
-          setLoading(false);
-        }
-      })();
-    }, 400);
-    return () => {
-      clearTimeout(id);
-      controller.abort();
-    };
-  }, [text, level, sourceLang, targetLang]);
+
 
 
   const translate = async () => {
