@@ -61,6 +61,4 @@ jobs:
         env:
           DJANGO_SETTINGS_MODULE: backend.dumbo.settings
           DATABASE_URL: "postgres://postgres:postgres@localhost:5432/dumbo_test"
-        run: |
-          cd backend
-          pytest -q
+        run: pytest -q
