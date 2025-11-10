@@ -54,8 +54,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
 
+      - name: Set PYTHONPATH so Django package is importable
+        run: echo "PYTHONPATH=$GITHUB_WORKSPACE/backend" >> $GITHUB_ENV
+
       - name: Run back-end tests (pytest-django)
         env:
           DJANGO_SETTINGS_MODULE: backend.dumbo.settings
           DATABASE_URL: "postgres://postgres:postgres@localhost:5432/dumbo_test"
-        run: pytest -q
+        run: |
+          cd backend
+          pytest -q
