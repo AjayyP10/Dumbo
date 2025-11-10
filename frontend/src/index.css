@@ -1,3 +1,4 @@
+/* stylelint-disable at-rule-no-unknown */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -6,3 +7,4 @@
 body {
   @apply font-sans leading-relaxed text-gray-800;
 }
+/* stylelint-enable */
