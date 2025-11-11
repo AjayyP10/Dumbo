@@ -14,16 +14,41 @@ from .serializers import (
     RegisterSerializer,
     UserLoginLogSerializer,
 )
-from .models import Translation, UserLoginLog
 from .permissions import IsOwner
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 MODEL = "google/gemma-3-27b-it:free"
-PROMPT_TMPL = (
-    'Translate the following English text into German at {level} proficiency level: "{input_text}". '
-    'Use simple vocabulary and grammar appropriate for that level, avoid overly literal phrasing, and preserve paragraphs. '
-    'Respond with ONLY the translated text (no additional explanations).'
-)
+
+# --- Prompt helpers (leaner prompts & optional chunking) --------------------
+SYSTEM_PROMPT = "You are a professional translator. Reply ONLY with the translated text."
+
+MAX_CHARS_PER_REQUEST = 1500  # safety margin vs LLM context length
+
+def _build_prompt(text: str, src: str, tgt: str, level: str = "") -> str:
+    """Return a concise translation prompt for the LLM."""
+    if tgt == "de" and level:
+        return (
+            f"Translate the following text from {src} to German ({level}).\\n\\n" + text
+        )
+    return f"Translate from {src} to {tgt}:\\n\\n" + text
+
+
+def _split_into_chunks(text: str, max_chars: int = MAX_CHARS_PER_REQUEST):
+    """Split long input on sentence boundaries to keep each chunk within max_chars."""
+    import re
+
+    sentences = re.split(r"(?<=[.!?])\\s+", text)
+    chunks, current = [], ""
+    for s in sentences:
+        # +1 for space/newline between sentences
+        if len(current) + len(s) + 1 > max_chars:
+            if current:
+                chunks.append(current.strip())
+                current = ""
+        current += s + " "
+    if current.strip():
+        chunks.append(current.strip())
+    return chunks
 
 class TranslateView(APIView):
     """Translate input text to German at a given CEFR level.
@@ -100,69 +125,57 @@ class TranslateView(APIView):
             "Content-Type": "application/json",
         }
 
-        # Build dynamic prompt
-        if target_lang == "de" and level:
-            prompt = (
-                f'Translate the following {source_lang} text into {dict(Translation.LANG_CHOICES).get(target_lang)} '
-                f'at {level} proficiency level: "{text}". '
-                'Use simple vocabulary and grammar appropriate for that level, avoid overly literal phrasing, and preserve paragraphs. '
-                'Respond with ONLY the translated text (no additional explanations).'
-            )
-        else:
-            prompt = (
-                f'Translate the following {dict(Translation.LANG_CHOICES).get(source_lang)} text into '
-                f'{dict(Translation.LANG_CHOICES).get(target_lang)}: "{text}". '
-                'Preserve paragraph breaks and respond with ONLY the translated text.'
-            )
+        # ---------------- Translation loop over chunks ----------------
+        src_lang_name = dict(Translation.LANG_CHOICES).get(source_lang)
+        tgt_lang_name = dict(Translation.LANG_CHOICES).get(target_lang)
+        chunks = _split_into_chunks(text)
+        translations_accum = []
 
-        payload = {
-            "model": MODEL,
-            "messages": [
-                {"role": "system", "content": "You are a helpful translator."},
-                {"role": "user", "content": prompt},
-            ],
-        }
-        # Retry up to 3 times with exponential back-off if upstream returns 429
-        retries = 0
-        backoff = 2  # seconds
-        while True:
-            try:
-                llm_resp = requests.post(
-                    OPENROUTER_URL, json=payload, headers=headers, timeout=30
-                )
-                if llm_resp.status_code == 429 and retries < 3:
-                    retries += 1
-                    import time
-                    time.sleep(backoff)
-                    backoff *= 2  # exponential
-                    continue
-                llm_resp.raise_for_status()
-                break  # success reached
-            except requests.exceptions.HTTPError as e:
-                if e.response is not None and e.response.status_code == 429 and retries < 3:
-                    retries += 1
-                    import time
-                    time.sleep(backoff)
-                    backoff *= 2
-                    continue
-                # Exceeded retries or different HTTP error
-                if e.response is not None and e.response.status_code == 429:
-                    return Response(
-                        {"error": "Upstream rate limit still exceeded. Please try later."},
-                        status=429,
+        for chunk in chunks:
+            prompt = _build_prompt(chunk, src_lang_name, tgt_lang_name, level)
+            payload = {
+                "model": MODEL,
+                "max_tokens": int(len(chunk.split()) * 2),  # loose upper-bound
+                "messages": [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt},
+                ],
+            }
+
+            retries = 0
+            backoff = 2  # seconds
+            while True:
+                try:
+                    llm_resp = requests.post(
+                        OPENROUTER_URL, json=payload, headers=headers, timeout=30
                     )
-                return Response({"error": str(e)}, status=e.response.status_code if e.response else 500)
-            except requests.exceptions.RequestException:
-                return Response(
-                    {"error": "Upstream translation service unavailable. Please try later."},
-                    status=503,
-                )
+                    if llm_resp.status_code == 429 and retries < 3:
+                        retries += 1
+                        import time
+                        time.sleep(backoff)
+                        backoff *= 2
+                        continue
+                    llm_resp.raise_for_status()
+                    break
+                except requests.exceptions.HTTPError as e:
+                    if e.response is not None and e.response.status_code == 429 and retries < 3:
+                        retries += 1
+                        import time
+                        time.sleep(backoff)
+                        backoff *= 2
+                        continue
+                    if e.response is not None and e.response.status_code == 429:
+                        return Response({"error": "Upstream rate limit still exceeded. Please try later."}, status=429)
+                    return Response({"error": str(e)}, status=e.response.status_code if e.response else 500)
+                except requests.exceptions.RequestException:
+                    return Response({"error": "Upstream translation service unavailable. Please try later."}, status=503)
 
-        raw_answer = llm_resp.json()["choices"][0]["message"]["content"]
+            translated_chunk = llm_resp.json()["choices"][0]["message"]["content"].strip()
+            translations_accum.append(translated_chunk)
 
-        # Use the entire translated text, preserving original paragraph breaks
-        translation = raw_answer.strip()
+        translation = "\n".join(translations_accum)
 
+        # Persist and cache
         Translation.objects.create(
             user=request.user,
             input_text=text,
@@ -171,6 +184,7 @@ class TranslateView(APIView):
             source_lang=source_lang,
             target_lang=target_lang,
         )
+        cache.set(cache_key, translation, int(os.getenv("CACHE_TTL", 3600)))
         return Response({"translation": translation}, status=201)
 
 class HistoryListView(generics.ListAPIView):
