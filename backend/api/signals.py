@@ -3,6 +3,16 @@ from django.dispatch import receiver
 from django.utils import timezone
 from django.contrib.auth.models import AnonymousUser
 from .models import UserLoginLog
+from django.db.models.signals import post_save, post_delete
+from django.core.cache import cache
+from .cache_utils import make_cache_key, _l1_delete
+from .models import Translation  # already imported above
+
+@receiver([post_save, post_delete], sender=Translation)
+def invalidate_translation_cache(sender, instance, **kwargs):
+    key = make_cache_key(instance.input_text, instance.source_lang, instance.target_lang, instance.level)
+    cache.delete(key)
+    _l1_delete(key)
 
 def _get_request_meta(request):
     """Return (ip_address, user_agent) tuple from request, tolerant of missing info."""

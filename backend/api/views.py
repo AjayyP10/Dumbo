@@ -1,40 +1,17 @@
-import os, json, hashlib, asyncio, zlib, base64, time
+import os, json, hashlib, time
 import httpx
 from asgiref.sync import sync_to_async
 from django.core.cache import cache
 
-# ---------------- In-process (L1) cache -----------------------------
-# Very simple dict with TTL. Suitable for single-process dev server or per-worker cache.
-_L1_CACHE: dict[str, tuple[float, str]] = {}
-_L1_DEFAULT_TTL = int(os.getenv("L1_CACHE_TTL", 300))  # 5 min default
-
-def _l1_get(key: str):
-    entry = _L1_CACHE.get(key)
-    if not entry:
-        return None
-    expires_at, value = entry
-    if expires_at is None or expires_at > time.time():
-        return value
-    # expired
-    del _L1_CACHE[key]
-    return None
-
-
-def _l1_set(key: str, value: str, ttl: int = _L1_DEFAULT_TTL):
-    _L1_CACHE[key] = (time.time() + ttl, value)
-
-# ---------------- Compression helpers for Redis (L2) ----------------
-
-def _compress(value: str) -> bytes:
-    return zlib.compress(value.encode("utf-8"))
-
-
-def _decompress(blob: bytes) -> str:
-    try:
-        return zlib.decompress(blob).decode("utf-8")
-    except zlib.error:
-        # Already plain string bytes
-        return blob.decode("utf-8")
+# Import shared caching helpers
+from .cache_utils import (
+    _l1_get,
+    _l1_set,
+    _l1_delete,
+    _compress,
+    _decompress,
+    make_cache_key,
+)
 from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -100,6 +77,7 @@ class TranslateView(APIView):
         return [permissions.IsAuthenticated()]
 
     def get(self, request):
+        """Synchronous GET handler (DRF browsable API help)."""
         return Response(
             {
                 "message": "Send a POST with {input_text, level} and Bearer token to receive a translation.",
@@ -107,7 +85,15 @@ class TranslateView(APIView):
             }
         )
 
-    async def post(self, request):
+    def post(self, request):
+        """Synchronous POST handler.
+
+        We reverted from async → sync because older DRF/Django versions raise
+        `TypeError: object Response can't be used in 'await' expression` when
+        an async view is wrapped by the default CSRF decorator. Using a
+        standard sync view avoids this incompatibility and still allows us to
+        off-load long-running work to Celery.
+        """
         text = request.data.get("input_text", "").strip()
         source_lang = request.data.get("source_lang", "en")
         target_lang = request.data.get("target_lang", "de")
@@ -127,14 +113,20 @@ class TranslateView(APIView):
             level = ""
 
         # Build a cache key and try cache first (fast, avoids DB + LLM hit)
-        import hashlib, json
-        cache_key_payload = {
-            "text": text,
-            "src": source_lang,
-            "tgt": target_lang,
-            "lvl": level,
-        }
-        cache_key = "translation:" + hashlib.sha256(json.dumps(cache_key_payload, sort_keys=True).encode()).hexdigest()
+        cache_key = make_cache_key(text, source_lang, target_lang, level)
+
+        # --- Optionally offload long or explicitly async requests to Celery ---
+        if request.query_params.get("async") == "1" or len(text) > int(os.getenv("ASYNC_TRANSLATE_THRESHOLD", 3000)):
+            from .tasks import translate_text_task
+            task = translate_text_task.delay(
+                user_id=request.user.id,
+                text=text,
+                source_lang=source_lang,
+                target_lang=target_lang,
+                level=level,
+                cache_key=cache_key,
+            )
+            return Response({"task_id": task.id, "status": "queued"}, status=202)
         # ------------- Level-1 (in-process) cache check ------------
         cached_translation = _l1_get(cache_key)
         if cached_translation:
@@ -195,13 +187,13 @@ class TranslateView(APIView):
                 max_connections=int(os.getenv("HTTPX_MAX_CONNECTIONS", 20)),
                 max_keepalive_connections=int(os.getenv("HTTPX_MAX_KEEPALIVE", 10)),
             )
-            async with httpx.AsyncClient(timeout=30, limits=limits) as client:
+            with httpx.Client(timeout=30, limits=limits) as client:
                 while True:
                     try:
-                        llm_resp = await client.post(OPENROUTER_URL, json=payload, headers=headers)
+                        llm_resp = client.post(OPENROUTER_URL, json=payload, headers=headers)
                         if llm_resp.status_code == 429 and retries < 3:
                             retries += 1
-                            await asyncio.sleep(backoff)
+                            time.sleep(backoff)
                             backoff *= 2
                             continue
                         llm_resp.raise_for_status()
@@ -209,7 +201,7 @@ class TranslateView(APIView):
                     except httpx.HTTPStatusError as e:
                         if e.response.status_code == 429 and retries < 3:
                             retries += 1
-                            await asyncio.sleep(backoff)
+                            time.sleep(backoff)
                             backoff *= 2
                             continue
                         if e.response.status_code == 429:

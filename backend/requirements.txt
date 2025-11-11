@@ -17,3 +17,5 @@ pytest-django>=4.7
 httpx[socks]>=0.25
 django-redis>=5.4
 httpx>=0.25
+celery[redis]>=5.3
+django-celery-results>=2.5

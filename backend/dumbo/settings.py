@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "corsheaders",
+    "django_celery_results",  # store Celery task results in DB (optional)
     "backend.api",  # updated to fully qualified path
 ]
 
@@ -123,6 +124,14 @@ else:
             "TIMEOUT": int(os.getenv("CACHE_TTL", 600)),
         }
     }
+
+# Celery configuration – use Redis broker / backend (falls back to CACHE_URL)
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL") or os.getenv("CACHE_URL") or "redis://localhost:6379/0"
+CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", CELERY_BROKER_URL)
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = "UTC"
 
 # Security
 SECURE_SSL_REDIRECT = not DEBUG
