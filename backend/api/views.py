@@ -1,4 +1,6 @@
-import os, json, hashlib, requests
+import os, json, hashlib, asyncio
+import httpx
+from asgiref.sync import sync_to_async
 from django.core.cache import cache
 from rest_framework import generics, permissions
 from rest_framework.response import Response
@@ -72,7 +74,7 @@ class TranslateView(APIView):
             }
         )
 
-    def post(self, request):
+    async def post(self, request):
         text = request.data.get("input_text", "").strip()
         source_lang = request.data.get("source_lang", "en")
         target_lang = request.data.get("target_lang", "de")
@@ -144,31 +146,28 @@ class TranslateView(APIView):
 
             retries = 0
             backoff = 2  # seconds
-            while True:
-                try:
-                    llm_resp = requests.post(
-                        OPENROUTER_URL, json=payload, headers=headers, timeout=30
-                    )
-                    if llm_resp.status_code == 429 and retries < 3:
-                        retries += 1
-                        import time
-                        time.sleep(backoff)
-                        backoff *= 2
-                        continue
-                    llm_resp.raise_for_status()
-                    break
-                except requests.exceptions.HTTPError as e:
-                    if e.response is not None and e.response.status_code == 429 and retries < 3:
-                        retries += 1
-                        import time
-                        time.sleep(backoff)
-                        backoff *= 2
-                        continue
-                    if e.response is not None and e.response.status_code == 429:
-                        return Response({"error": "Upstream rate limit still exceeded. Please try later."}, status=429)
-                    return Response({"error": str(e)}, status=e.response.status_code if e.response else 500)
-                except requests.exceptions.RequestException:
-                    return Response({"error": "Upstream translation service unavailable. Please try later."}, status=503)
+            async with httpx.AsyncClient(timeout=30) as client:
+                while True:
+                    try:
+                        llm_resp = await client.post(OPENROUTER_URL, json=payload, headers=headers)
+                        if llm_resp.status_code == 429 and retries < 3:
+                            retries += 1
+                            await asyncio.sleep(backoff)
+                            backoff *= 2
+                            continue
+                        llm_resp.raise_for_status()
+                        break
+                    except httpx.HTTPStatusError as e:
+                        if e.response.status_code == 429 and retries < 3:
+                            retries += 1
+                            await asyncio.sleep(backoff)
+                            backoff *= 2
+                            continue
+                        if e.response.status_code == 429:
+                            return Response({"error": "Upstream rate limit still exceeded. Please try later."}, status=429)
+                        return Response({"error": str(e)}, status=e.response.status_code)
+                    except httpx.RequestError:
+                        return Response({"error": "Upstream translation service unavailable. Please try later."}, status=503)
 
             translated_chunk = llm_resp.json()["choices"][0]["message"]["content"].strip()
             translations_accum.append(translated_chunk)
