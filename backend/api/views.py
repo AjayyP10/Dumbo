@@ -1,7 +1,40 @@
-import os, json, hashlib, asyncio
+import os, json, hashlib, asyncio, zlib, base64, time
 import httpx
 from asgiref.sync import sync_to_async
 from django.core.cache import cache
+
+# ---------------- In-process (L1) cache -----------------------------
+# Very simple dict with TTL. Suitable for single-process dev server or per-worker cache.
+_L1_CACHE: dict[str, tuple[float, str]] = {}
+_L1_DEFAULT_TTL = int(os.getenv("L1_CACHE_TTL", 300))  # 5 min default
+
+def _l1_get(key: str):
+    entry = _L1_CACHE.get(key)
+    if not entry:
+        return None
+    expires_at, value = entry
+    if expires_at is None or expires_at > time.time():
+        return value
+    # expired
+    del _L1_CACHE[key]
+    return None
+
+
+def _l1_set(key: str, value: str, ttl: int = _L1_DEFAULT_TTL):
+    _L1_CACHE[key] = (time.time() + ttl, value)
+
+# ---------------- Compression helpers for Redis (L2) ----------------
+
+def _compress(value: str) -> bytes:
+    return zlib.compress(value.encode("utf-8"))
+
+
+def _decompress(blob: bytes) -> str:
+    try:
+        return zlib.decompress(blob).decode("utf-8")
+    except zlib.error:
+        # Already plain string bytes
+        return blob.decode("utf-8")
 from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -102,8 +135,20 @@ class TranslateView(APIView):
             "lvl": level,
         }
         cache_key = "translation:" + hashlib.sha256(json.dumps(cache_key_payload, sort_keys=True).encode()).hexdigest()
-        cached_translation = cache.get(cache_key)
+        # ------------- Level-1 (in-process) cache check ------------
+        cached_translation = _l1_get(cache_key)
         if cached_translation:
+            return Response({"translation": cached_translation}, status=200)
+
+        # ------------- Level-2 (Redis/django-redis) check ------------
+        redis_blob = cache.get(cache_key)
+        if isinstance(redis_blob, (bytes, bytearray)):
+            cached_translation = _decompress(redis_blob)
+        else:
+            cached_translation = redis_blob
+        if cached_translation:
+            # Populate L1 for faster subsequent access within process
+            _l1_set(cache_key, cached_translation)
             return Response({"translation": cached_translation}, status=200)
 
         # Attempt to reuse recent identical translation in DB before calling LLM
@@ -146,7 +191,11 @@ class TranslateView(APIView):
 
             retries = 0
             backoff = 2  # seconds
-            async with httpx.AsyncClient(timeout=30) as client:
+            limits = httpx.Limits(
+                max_connections=int(os.getenv("HTTPX_MAX_CONNECTIONS", 20)),
+                max_keepalive_connections=int(os.getenv("HTTPX_MAX_KEEPALIVE", 10)),
+            )
+            async with httpx.AsyncClient(timeout=30, limits=limits) as client:
                 while True:
                     try:
                         llm_resp = await client.post(OPENROUTER_URL, json=payload, headers=headers)
@@ -183,7 +232,11 @@ class TranslateView(APIView):
             source_lang=source_lang,
             target_lang=target_lang,
         )
-        cache.set(cache_key, translation, int(os.getenv("CACHE_TTL", 3600)))
+
+        # Cache stampede protection via add() (SETNX) so only first writer stores
+        compressed = _compress(translation)
+        cache.add(cache_key, compressed, int(os.getenv("CACHE_TTL", 3600)))
+        _l1_set(cache_key, translation)
         return Response({"translation": translation}, status=201)
 
 class HistoryListView(generics.ListAPIView):
