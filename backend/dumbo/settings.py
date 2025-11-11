@@ -100,6 +100,30 @@ STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "static"
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
+# Caching: prefer Redis if CACHE_URL present, else fall back to local memory (dev)
+CACHE_URL = os.getenv("CACHE_URL")  # e.g. redis://localhost:6379/1
+if CACHE_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": CACHE_URL,
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                # Avoid hammering Redis with serialization by using JSON serializer
+                "SERIALIZER": "django_redis.serializers.json.JSONSerializer",
+            },
+            "TIMEOUT": int(os.getenv("CACHE_TTL", 3600)),  # 1 h default
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "unique-dumbo-cache",
+            "TIMEOUT": int(os.getenv("CACHE_TTL", 600)),
+        }
+    }
+
 # Security
 SECURE_SSL_REDIRECT = not DEBUG
 SESSION_COOKIE_SECURE = not DEBUG

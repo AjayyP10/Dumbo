@@ -7,7 +7,13 @@ dj-database-url>=2.1
 psycopg2-binary>=2.9
 whitenoise>=6.6
 requests>=2.31
+httpx[http2]>=0.25  # async HTTP client
+# Caching
+django-redis>=5.4
 gunicorn>=21.2
 # Testing
 pytest>=7.4
 pytest-django>=4.7
+httpx[socks]>=0.25
+django-redis>=5.4
+httpx>=0.25

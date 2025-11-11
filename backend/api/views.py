@@ -1,4 +1,5 @@
-import os, requests
+import os, json, hashlib, requests
+from django.core.cache import cache
 from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -65,7 +66,20 @@ class TranslateView(APIView):
             # For other target languages, ignore level
             level = ""
 
-        # Attempt to reuse recent identical translation to avoid unnecessary API calls
+        # Build a cache key and try cache first (fast, avoids DB + LLM hit)
+        import hashlib, json
+        cache_key_payload = {
+            "text": text,
+            "src": source_lang,
+            "tgt": target_lang,
+            "lvl": level,
+        }
+        cache_key = "translation:" + hashlib.sha256(json.dumps(cache_key_payload, sort_keys=True).encode()).hexdigest()
+        cached_translation = cache.get(cache_key)
+        if cached_translation:
+            return Response({"translation": cached_translation}, status=200)
+
+        # Attempt to reuse recent identical translation in DB before calling LLM
         existing = (
             Translation.objects.filter(
                 input_text=text,
@@ -77,6 +91,8 @@ class TranslateView(APIView):
             .first()
         )
         if existing:
+            # backfill cache for next time
+            cache.set(cache_key, existing.output_text, int(os.getenv("CACHE_TTL", 3600)))
             return Response({"translation": existing.output_text}, status=200)
 
         headers = {

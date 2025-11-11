@@ -1,0 +1,37 @@
+/* Container */
+.level-menu {
+  width: 60px;                 /* tweak as needed */
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  background: #1f2937;         /* dark slate */
+  border-radius: 6px;          /* rounded edges top+bottom */
+  overflow: hidden;            /* hides child borders that stick out */
+  font-family: system-ui, sans-serif;
+  user-select: none;           /* no accidental text selection */
+}
+
+/* Each item */
+.level-item {
+  padding: 8px 0;
+  text-align: center;
+  color: #d1d5db;              /* text-gray-300 */
+  border-bottom: 1px solid #374151; /* thin separator line */
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+
+.level-item:last-child {
+  border-bottom: none;         /* no separator after last item */
+}
+
+/* Hover effect */
+.level-item:hover {
+  background: #374151;         /* slightly lighter dark */
+}
+
+/* Selected (active) item */
+.level-item.active {
+  background: #2563eb;         /* blue-600 */
+  color: #ffffff;
+}
