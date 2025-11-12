@@ -11,6 +11,8 @@ from .cache_utils import (
     _compress,
     _decompress,
     make_cache_key,
+    chunk_get,
+    chunk_set,
 )
 from rest_framework import generics, permissions
 from rest_framework.response import Response
@@ -20,6 +22,7 @@ import csv
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework_simplejwt.views import TokenObtainPairView
+from celery.result import AsyncResult
 from .models import Translation, UserLoginLog
 from .serializers import (
     TranslationSerializer,
@@ -170,39 +173,55 @@ class TranslateView(APIView):
         chunks = _split_into_chunks(text)
         translations_accum = []
 
-        for chunk in chunks:
-            prompt = _build_prompt(chunk, src_lang_name, tgt_lang_name, level)
-            payload = {
-                "model": MODEL,
-                "max_tokens": int(len(chunk.split()) * 2),  # loose upper-bound
-                "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt},
-                ],
-            }
+        limits = httpx.Limits(
+            max_connections=int(os.getenv("HTTPX_MAX_CONNECTIONS", 20)),
+            max_keepalive_connections=int(os.getenv("HTTPX_MAX_KEEPALIVE", 10)),
+        )
+        with httpx.Client(timeout=30, limits=limits) as client:
+            for chunk in chunks:
+                cached_chunk = chunk_get(chunk, source_lang, target_lang, level)
+                if cached_chunk:
+                    translations_accum.append(cached_chunk)
+                    continue
+                prompt = _build_prompt(chunk, src_lang_name, tgt_lang_name, level)
+                payload = {
+                    "model": MODEL,
+                    "max_tokens": int(len(chunk.split()) * 2),
+                    "temperature": 0,
+                    "top_p": 0.1,
+                    "messages": [
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": prompt},
+                    ],
+                }
 
-            retries = 0
-            backoff = 2  # seconds
-            limits = httpx.Limits(
-                max_connections=int(os.getenv("HTTPX_MAX_CONNECTIONS", 20)),
-                max_keepalive_connections=int(os.getenv("HTTPX_MAX_KEEPALIVE", 10)),
-            )
-            with httpx.Client(timeout=30, limits=limits) as client:
+                retries = 0
+                backoff = 2
                 while True:
                     try:
                         llm_resp = client.post(OPENROUTER_URL, json=payload, headers=headers)
                         if llm_resp.status_code == 429 and retries < 3:
                             retries += 1
-                            time.sleep(backoff)
-                            backoff *= 2
+                            ra = llm_resp.headers.get("Retry-After")
+                            try:
+                                wait = int(ra) if ra else backoff
+                            except Exception:
+                                wait = backoff
+                            time.sleep(wait)
+                            backoff = min(backoff * 2, 30)
                             continue
                         llm_resp.raise_for_status()
                         break
                     except httpx.HTTPStatusError as e:
                         if e.response.status_code == 429 and retries < 3:
                             retries += 1
-                            time.sleep(backoff)
-                            backoff *= 2
+                            ra = e.response.headers.get("Retry-After")
+                            try:
+                                wait = int(ra) if ra else backoff
+                            except Exception:
+                                wait = backoff
+                            time.sleep(wait)
+                            backoff = min(backoff * 2, 30)
                             continue
                         if e.response.status_code == 429:
                             return Response({"error": "Upstream rate limit still exceeded. Please try later."}, status=429)
@@ -210,8 +229,9 @@ class TranslateView(APIView):
                     except httpx.RequestError:
                         return Response({"error": "Upstream translation service unavailable. Please try later."}, status=503)
 
-            translated_chunk = llm_resp.json()["choices"][0]["message"]["content"].strip()
-            translations_accum.append(translated_chunk)
+                translated_chunk = llm_resp.json()["choices"][0]["message"]["content"].strip()
+                chunk_set(chunk, source_lang, target_lang, level, translated_chunk)
+                translations_accum.append(translated_chunk)
 
         translation = "\n".join(translations_accum)
 
@@ -287,3 +307,59 @@ class ExportHistoryView(APIView):
                 t.output_text.replace("\n", " "),
             ])
         return response
+
+class TaskStatusView(APIView):
+    """Return Celery task status (and result/timing) for a given task_id.
+
+    Example response while running:
+        {
+          "task_id": "c2e3...",
+          "state": "STARTED",
+          "started_at": "2024-06-12T14:33:11.123Z",
+          "finished_at": null
+        }
+
+    Example response when finished:
+        {
+          "task_id": "c2e3...",
+          "state": "SUCCESS",
+          "started_at": "2024-06-12T14:33:11.123Z",
+          "finished_at": "2024-06-12T14:33:15.007Z",
+          "result": "Hallo Welt!"
+        }
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def _to_iso(self, value):
+        """Return ISO-8601 string for datetime or epoch seconds, else None."""
+        if value is None:
+            return None
+        # Celery backends may return either datetime or float timestamps
+        from datetime import datetime
+        from django.utils import timezone
+
+        # If it's already a datetime, ensure it is aware & ISO-format it
+        if isinstance(value, datetime):
+            if timezone.is_naive(value):
+                value = timezone.make_aware(value, timezone.utc)
+            return value.isoformat()
+        # Fallback: treat as epoch seconds
+        try:
+            return datetime.utcfromtimestamp(float(value)).replace(tzinfo=timezone.utc).isoformat()
+        except Exception:
+            return None
+
+    def get(self, request, task_id):
+        res = AsyncResult(str(task_id))
+        data = {
+            "task_id": str(task_id),
+            "state": res.state,
+            "started_at": self._to_iso(getattr(res, "date_created", None)),
+            "finished_at": self._to_iso(getattr(res, "date_done", None)),
+        }
+        if res.state == "SUCCESS":
+            data["result"] = res.result
+        elif res.state == "FAILURE":
+            data["error"] = str(res.result)
+        return Response(data)

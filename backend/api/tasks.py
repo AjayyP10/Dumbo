@@ -4,7 +4,7 @@ from django.core.cache import cache
 from django.contrib.auth import get_user_model
 
 from .models import Translation
-from .cache_utils import _compress, _l1_set, make_cache_key
+from .cache_utils import _compress, _l1_set, make_cache_key, chunk_get, chunk_set
 from .views import SYSTEM_PROMPT, _build_prompt, _split_into_chunks, OPENROUTER_URL, MODEL
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={"max_retries": 3})
@@ -27,24 +27,35 @@ def translate_text_task(self, user_id: int, text: str, source_lang: str, target_
         max_keepalive_connections=int(os.getenv("HTTPX_MAX_KEEPALIVE", 10)),
     )
 
-    async def _translate_chunk(chunk: str) -> str:
+    async def _translate_chunk(client: httpx.AsyncClient, chunk: str) -> str:
         prompt = _build_prompt(chunk, src_name, tgt_name, level)
         payload = {
             "model": MODEL,
             "max_tokens": int(len(chunk.split()) * 2),
+            "temperature": 0,
+            "top_p": 0.1,
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": prompt},
             ],
         }
-        async with httpx.AsyncClient(timeout=30, limits=limits) as client:
-            resp = await client.post(OPENROUTER_URL, json=payload, headers=headers)
-            resp.raise_for_status()
-            return resp.json()["choices"][0]["message"]["content"].strip()
+        resp = await client.post(OPENROUTER_URL, json=payload, headers=headers)
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"]["content"].strip()
 
     async def _run_async():
-        for chunk in chunks:
-            translations.append(await _translate_chunk(chunk))
+        async with httpx.AsyncClient(timeout=30, limits=limits) as client:
+            # Bound concurrency to avoid too many parallel upstream calls
+            sem = asyncio.Semaphore(int(os.getenv("PARALLEL_CHUNK_LIMIT", 5)))
+            for chunk in chunks:
+                async with sem:
+                    cached = chunk_get(chunk, source_lang, target_lang, level)
+                    if cached:
+                        translations.append(cached)
+                        continue
+                    translated = await _translate_chunk(client, chunk)
+                    translations.append(translated)
+                    chunk_set(chunk, source_lang, target_lang, level, translated)
         return "\n".join(translations)
 
     translation = asyncio.run(_run_async())

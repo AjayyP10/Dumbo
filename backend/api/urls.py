@@ -9,6 +9,7 @@ from .views import (
     RegisterView,
     LoginLogListView,
     ExportHistoryView,
+    TaskStatusView,
 )
 
 urlpatterns = [
@@ -19,4 +20,5 @@ urlpatterns = [
     path("register/", RegisterView.as_view(), name="register"),
     path("login-logs/", LoginLogListView.as_view(), name="login_logs"),
     path("export-history/", ExportHistoryView.as_view(), name="export_history"),
+    path("tasks/<uuid:task_id>/", TaskStatusView.as_view(), name="task_status"),
 ]

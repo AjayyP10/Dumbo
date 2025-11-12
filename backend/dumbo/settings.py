@@ -86,6 +86,14 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
     ),
 
+    "DEFAULT_THROTTLE_CLASSES": (
+        "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.AnonRateThrottle",
+    ),
+    "DEFAULT_THROTTLE_RATES": {
+        "user": os.getenv("THROTTLE_RATE_USER", "20/min"),
+        "anon": os.getenv("THROTTLE_RATE_ANON", "10/min"),
+    },
 }
 
 SIMPLE_JWT = {
