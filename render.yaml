@@ -60,9 +60,9 @@ services:
     plan: free
     region: frankfurt
 
-  - type: static
+  - type: web
     name: dumbo-frontend
-    env: static
+    runtime: static
     buildCommand: |
       npm install --prefix frontend
       npm run --prefix frontend build
