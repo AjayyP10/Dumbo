@@ -4,10 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Dumbo Translator</title>
-    <script type="module" crossorigin src="/assets/index-DX-XJdZY.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-C6G_3qQV.css">
-  </head>
-  <body class="bg-gray-50">
+    <script type="module" crossorigin src="/assets/index-DUAenTmq.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-DnnacZcm.css">
+  <link rel="manifest" href="/manifest.webmanifest"></head>
+  <script>
+    // Set initial theme before the app loads to avoid FOUC
+    const storedTheme = localStorage.getItem('theme');
+    if (storedTheme === 'dark' || (!storedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.classList.add('dark');
+    }
+  </script>
+  <body class="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100">
     <div id="root"></div>
   </body>
 </html>
