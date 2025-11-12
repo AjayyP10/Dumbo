@@ -23,19 +23,19 @@ export default function Register() {
         <h1 className="text-3xl font-extrabold text-center text-gray-800 mb-6">Create Account</h1>
         <form onSubmit={onSubmit} className="space-y-4">
           <input
-            className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold text-gray-800 placeholder-gray-500"
             placeholder="Username"
             value={data.username}
             onChange={(e) => setData({ ...data, username: e.target.value })}
           />
           <input
-            className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold text-gray-800 placeholder-gray-500"
             placeholder="Email"
             value={data.email}
             onChange={(e) => setData({ ...data, email: e.target.value })}
           />
           <input
-            className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold text-gray-800 placeholder-gray-500"
             placeholder="Password"
             type="password"
             value={data.password}
