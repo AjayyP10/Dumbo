@@ -23,7 +23,7 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500">
       <div className="w-full max-w-sm bg-white/80 backdrop-blur-lg rounded-xl shadow-xl p-8">
-        <h1 className="text-3xl font-extrabold text-center text-gray-800 mb-6">Welcome Back</h1>
+        <h1 className="text-3xl font-extrabold text-center text-gray-800 mb-6">Welcome</h1>
         <form onSubmit={onSubmit} className="space-y-4">
           <input
             className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold text-gray-800 placeholder-gray-500"
