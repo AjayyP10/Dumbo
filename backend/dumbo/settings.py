@@ -16,6 +16,7 @@ CSRF_TRUSTED_ORIGINS = [f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME', '')}"]
 CORS_ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "").split(",")
 
 INSTALLED_APPS = [
+    "social_django",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -78,6 +79,12 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # DRF + JWT
+# Authentication backends (add Google OAuth2)
+AUTHENTICATION_BACKENDS = [
+    "social_core.backends.google.GoogleOAuth2",
+    "django.contrib.auth.backends.ModelBackend",
+]
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
@@ -95,6 +102,15 @@ REST_FRAMEWORK = {
         "anon": os.getenv("THROTTLE_RATE_ANON", "10/min"),
     },
 }
+
+# Social Auth (Google)
+SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = os.getenv("GOOGLE_CLIENT_ID")
+SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+SOCIAL_AUTH_LOGIN_REDIRECT_URL = "/api/oauth/google/jwt/"
+# After social-auth completes OAuth handshake, redirect here to issue JWT tokens
+# If running behind HTTPS proxy (Render), tell social-auth to assume HTTPS
+# Use HTTPS redirects only in production (Render)
+SOCIAL_AUTH_REDIRECT_IS_HTTPS = not DEBUG
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),

@@ -16,6 +16,8 @@ from .cache_utils import (
 )
 from rest_framework import generics, permissions
 from rest_framework.response import Response
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.authentication import SessionAuthentication
 from rest_framework.views import APIView
 from django.http import HttpResponse
 import csv
@@ -79,7 +81,7 @@ class TranslateView(APIView):
             return []  # = AllowAny
         return [permissions.IsAuthenticated()]
 
-    def get(self, request):
+    def get(self, request, *args, **kwargs):
         """Synchronous GET handler (DRF browsable API help)."""
         return Response(
             {
@@ -307,6 +309,29 @@ class ExportHistoryView(APIView):
                 t.output_text.replace("\n", " "),
             ])
         return response
+
+class GoogleAuthComplete(APIView):
+    """Custom view that is called after Google OAuth completes.
+
+    Expects the user to be authenticated in the session by social-auth-app-django.
+    Issues a pair of JWT tokens so the SPA can authenticate subsequent requests.
+    """
+
+    authentication_classes = [SessionAuthentication]
+    from rest_framework.renderers import JSONRenderer
+    renderer_classes = [JSONRenderer]
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        if not request.user or not request.user.is_authenticated:
+            return Response({"error": "Authentication failed"}, status=401)
+
+        refresh = RefreshToken.for_user(request.user)
+        return Response({
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+        })
+
 
 class TaskStatusView(APIView):
     """Return Celery task status (and result/timing) for a given task_id.
