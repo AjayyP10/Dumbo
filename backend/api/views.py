@@ -186,7 +186,7 @@ class TranslateView(APIView):
                 prompt = _build_prompt(chunk, src_lang_name, tgt_lang_name, level)
                 payload = {
                     "model": MODEL,
-                    "max_tokens": int(len(chunk.split()) * 2),
+                    "max_tokens": max(60, int(len(chunk.split()) * 4)),
                     "temperature": 0,
                     "top_p": 0.1,
                     "messages": [
