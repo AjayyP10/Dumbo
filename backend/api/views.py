@@ -19,7 +19,7 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.views import APIView
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect
 import csv
 from django.contrib.auth import get_user_model
 from django.utils import timezone
@@ -318,8 +318,7 @@ class GoogleAuthComplete(APIView):
     """
 
     authentication_classes = [SessionAuthentication]
-    from rest_framework.renderers import JSONRenderer
-    renderer_classes = [JSONRenderer]
+    # We will perform a redirect instead of JSON, so no renderer needed
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
@@ -327,10 +326,13 @@ class GoogleAuthComplete(APIView):
             return Response({"error": "Authentication failed"}, status=401)
 
         refresh = RefreshToken.for_user(request.user)
-        return Response({
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
-        })
+        # Build redirect URL to frontend
+        frontend_base = os.getenv("FRONTEND_URL", "http://localhost:5173")
+        # Pass tokens via URL fragment so they are not sent to server logs
+        redirect_url = (
+            f"{frontend_base}/oauth-complete#access={str(refresh.access_token)}&refresh={str(refresh)}"
+        )
+        return HttpResponseRedirect(redirect_url)
 
 
 class TaskStatusView(APIView):

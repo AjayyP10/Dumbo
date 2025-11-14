@@ -6,6 +6,7 @@ import "./index.css";
 import "./i18n";
 import App from "./App";
 import Login from "./pages/Login";
+import OAuthComplete from "./pages/OAuthComplete";
 import Register from "./pages/Register";
 import Translate from "./pages/Translate";
 import History from "./pages/History";
@@ -35,6 +36,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Route
           path="/register"
           element={<PublicOnly><Register /></PublicOnly>}
+        />
+        <Route
+          path="/oauth-complete"
+          element={<OAuthComplete />}
         />
       </Routes>
     </BrowserRouter>
