@@ -18,6 +18,8 @@ from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.authentication import SessionAuthentication
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework.views import APIView
 from django.http import HttpResponse, HttpResponseRedirect
 import csv
@@ -353,13 +355,59 @@ class GoogleAuthComplete(APIView):
             return Response({"error": "Authentication failed"}, status=401)
 
         refresh = RefreshToken.for_user(request.user)
-        # Build redirect URL to frontend
+        # Include the user's email in both refresh & access tokens so the SPA can
+        # greet the user without an extra API call.
+        email = request.user.email or request.user.get_username()
+        refresh["email"] = email
+        refresh.access_token["email"] = email
+
+        # Build redirect URL to frontend, embedding tokens in URL fragment so
+        # they are never sent to the server via HTTP referer or logs.
         frontend_base = os.getenv("FRONTEND_URL", "http://localhost:5173")
-        # Pass tokens via URL fragment so they are not sent to server logs
         redirect_url = (
             f"{frontend_base}/oauth-complete#access={str(refresh.access_token)}&refresh={str(refresh)}"
         )
         return HttpResponseRedirect(redirect_url)
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class LogoutView(APIView):
+    """Log out the current session (clears Django session cookies).
+
+    This endpoint allows the SPA to ensure the server-side session created by
+    social-auth is terminated when the user logs out or before switching
+    accounts. It is intentionally CSRF-exempt because it performs no state-
+    changing action beyond clearing the user’s own session.
+    """
+
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = [SessionAuthentication]
+
+    
+
+    def post(self, request):
+        from django.contrib.auth import logout as django_logout
+        django_logout(request)
+        return Response({"detail": "Logged out."})
+
+
+class DeleteAccountView(APIView):
+    """Delete the authenticated user's account and all related data.
+
+    Performs a hard delete on the Django User instance which cascades to
+    related models (UserProfile, Translation, etc.). Returns HTTP 204 on
+    success so the SPA can clear local state and redirect to login.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request):
+        # Keep a reference to the user before deleting for potential auditing
+        user = request.user
+        username = user.username
+        user.delete()
+        # If we reach here, deletion succeeded
+        return Response({"detail": f"User '{username}' and related data deleted."}, status=204)
 
 
 class TaskStatusView(APIView):

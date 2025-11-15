@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
+import toast from "react-hot-toast";
+import { deleteAccount } from "../api";
 import { logout, getUsername, isLoggedIn } from "../auth";
 import { useTranslation } from "react-i18next";
 
@@ -29,6 +31,20 @@ export default function Navbar() {
     navigate("/login", { replace: true });
   };
 
+  const handleDelete = async () => {
+    if (!window.confirm("Are you sure you want to delete your account? This action cannot be undone.")) {
+      return;
+    }
+    try {
+      await deleteAccount();
+      toast.success("Account deleted successfully");
+      logout();
+      navigate("/login", { replace: true });
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || "Failed to delete account");
+    }
+  };
+
   return (
     <nav className="bg-white dark:bg-gray-900 shadow p-4 flex justify-between">
       <Link to="/translate" className="font-bold dark:text-gray-100">
@@ -52,6 +68,9 @@ export default function Navbar() {
             <span className="mr-2 dark:text-gray-100">{t('hello', { name: getUsername() ?? 'User' })}</span>
             <button onClick={handleLogout} className="text-blue-600 dark:text-blue-400">
               {t('logout')}
+            </button>
+            <button onClick={handleDelete} className="text-red-600 dark:text-red-400">
+              Delete Account
             </button>
           </>
         )}

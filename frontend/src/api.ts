@@ -7,6 +7,9 @@ export const api = axios.create({
   baseURL: `${API_URL}/api/`,
 });
 
+// Convenience helper to delete the authenticated user's account
+export const deleteAccount = () => api.delete("delete-account/");
+
 // Attach access token before each request
 api.interceptors.request.use((config) => {
   const token = getAccessToken();

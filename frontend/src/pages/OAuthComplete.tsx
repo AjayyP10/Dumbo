@@ -26,6 +26,8 @@ export default function OAuthComplete() {
       const refresh = params.get("refresh");
 
       if (access && refresh) {
+        // Clear any previously stored username in case a different user logs in
+        localStorage.removeItem("username");
         saveTokens(access, refresh);
         const display = await fetchProfile();
         if (display) {

@@ -16,14 +16,12 @@ export const getRefreshToken = () => localStorage.getItem("refresh");
 export const isLoggedIn = () => Boolean(getAccessToken());
 
 export const getUsername = (): string | null => {
-  const stored = localStorage.getItem("username");
-  if (stored) return stored;
-  // Fallback to decoding token if username not saved explicitly
-  const token = getAccessToken();
-  if (!token) return null;
+  // Decode the email claim that the backend now embeds in the JWT access token.
+  const access = getAccessToken();
+  if (!access) return null;
   try {
-    const decoded = jwtDecode<{ username?: string }>(token);
-    return decoded?.username || null;
+    const decoded: any = jwtDecode(access);
+    return decoded?.email || null;
   } catch {
     return null;
   }

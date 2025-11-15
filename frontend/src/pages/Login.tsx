@@ -49,7 +49,17 @@ export default function Login() {
               Login
             </button>
             <a
-              href={`${API_URL}/api/oauth/login/google-oauth2/`}
+              onClick={async () => {
+                // Clear any client-side cached username and server-side session to avoid
+                // leaking the previous Google account’s profile when switching users.
+                localStorage.removeItem("username");
+                try {
+                  await fetch(`${API_URL}/api/logout/`, { method: "POST", credentials: "include" });
+                } catch (_) {
+                  /* network errors can be ignored – we clear localStorage anyway */
+                }
+              }}
+              href={`${API_URL}/api/oauth/login/google-oauth2/?prompt=select_account` }
               className="px-3 py-2 border border-gray-300 rounded bg-white hover:bg-gray-100 flex items-center justify-center"
             >
               {/* Google logo */}
