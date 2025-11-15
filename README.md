@@ -1,11 +1,11 @@
 # Dumbo 🐘
 
-English-to-German translator (CEFR A1-B2) built with Django + DRF (backend) & React + Vite + Tailwind (frontend).  
+Multi-language translation app with CEFR-level customization (A1–B2 for German, Spanish and French) built with Django + DRF (backend) & React + Vite + Tailwind (frontend).  
 LLM: `google/gemma-3-27b-it:free` via OpenRouter.
 
 ---
 
-## 1. Local development
+## 1. Local development 
 
 ```bash
 # backend

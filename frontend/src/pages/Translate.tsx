@@ -177,7 +177,7 @@ export default function Translate() {
                   setError(null);
                 }
               }}
-              placeholder="Enter English text"
+              placeholder="Enter text to translate"
               ref={textareaRef}
             />
             <p className="text-xs text-gray-500 mb-3">{text.length} characters</p>
