@@ -41,12 +41,29 @@ export default function Login() {
             onChange={(e) => setData({ ...data, password: e.target.value })}
           />
           {error && <p className="text-red-600 text-sm">{error}</p>}
-          <button className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2 w-full rounded">
-            Login
-          </button>
+          <div className="flex space-x-2">
+            <button
+              type="submit"
+              className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2 rounded"
+            >
+              Login
+            </button>
+            <a
+              href={`${API_URL}/api/oauth/login/google-oauth2/`}
+              className="px-3 py-2 border border-gray-300 rounded bg-white hover:bg-gray-100 flex items-center justify-center"
+            >
+              {/* Google logo */}
+              <svg className="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 533.5 544.3">
+                <path fill="#4285F4" d="M533.5 278.4c0-17.4-1.4-34-4-50.2H272.1v95.1h146.9c-6.3 34-25 62.9-53.5 82.2v68h86.5c50.8-46.8 81.5-115.7 81.5-195.1z"/>
+                <path fill="#34A853" d="M272.1 544.3c72.3 0 132.8-23.9 177-64.9l-86.5-68c-23.6 15.5-54 24.6-90.5 24.6-69.6 0-128.5-46.9-149.4-109.5H34.4v68.8c44 87.4 135.1 149 237.7 149z"/>
+                <path fill="#FBBC05" d="M122.7 326.6c-10.1-29.7-10.1-61.4 0-91.1V166.7H34.4c-36.8 73.3-36.8 160.8 0 234.1l88.3-69.5z"/>
+                <path fill="#EA4335" d="M272.1 107.5c39.3-.6 75.8 14 103.8 40.9l77.8-77.8C415.1 24 347.5 0 272.1 0 169.5 0 78.4 61.6 34.4 149l88.3 69.5c20.9-62.5 79.8-109.5 149.4-109.5z"/>
+              </svg>
+            </a>
+          </div>
         </form>
         {/* Google OAuth login */}
-        <div className="mt-4">
+        <div className="mt-4 hidden">
           <a
             href={`${API_URL}/api/oauth/login/google-oauth2/`}
             className="flex items-center justify-center w-full px-4 py-2 border border-gray-300 rounded text-gray-700 bg-white hover:bg-gray-100"
