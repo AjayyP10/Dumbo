@@ -11,6 +11,7 @@ from .views import (
     ExportHistoryView,
     TaskStatusView,
     GoogleAuthComplete,
+    UserProfileView,
 )
 
 urlpatterns = [
@@ -23,6 +24,7 @@ urlpatterns = [
     path("history/", HistoryListView.as_view(), name="history"),
     path("register/", RegisterView.as_view(), name="register"),
     path("login-logs/", LoginLogListView.as_view(), name="login_logs"),
+    path("profile/", UserProfileView.as_view(), name="profile"),
     path("export-history/", ExportHistoryView.as_view(), name="export_history"),
     path("tasks/<uuid:task_id>/", TaskStatusView.as_view(), name="task_status"),
 ]

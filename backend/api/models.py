@@ -28,6 +28,18 @@ class Translation(models.Model):
         ordering = ["-created_at"]
 
 
+class UserProfile(models.Model):
+    """Stores additional info for a user such as chosen display name."""
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
+    # Display name chosen by the user after first Google login. Unique & optional until set.
+    display_name = models.CharField(max_length=150, unique=True, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.display_name or self.user.get_username() or "(no name)"
+
+
 class UserLoginLog(models.Model):
     """Stores each user login attempt (success or failure)."""
 

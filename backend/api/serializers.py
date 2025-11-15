@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import Translation, UserLoginLog
+from .models import Translation, UserLoginLog, UserProfile
 
 class TranslationSerializer(serializers.ModelSerializer):
     class Meta:
@@ -21,6 +21,26 @@ class UserLoginLogSerializer(serializers.ModelSerializer):
         model = UserLoginLog
         fields = ("id", "timestamp", "ip_address", "user_agent", "success")
         read_only_fields = fields
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserProfile
+        fields = ("display_name",)
+        extra_kwargs = {
+            "display_name": {
+                "required": True,
+                "allow_blank": False,
+                "min_length": 2,
+                "max_length": 150,
+            }
+        }
+
+    def validate_display_name(self, value):
+        # Enforce uniqueness at serializer level for clearer error
+        if UserProfile.objects.filter(display_name__iexact=value).exists():
+            raise serializers.ValidationError("This username is already taken.")
+        return value
 
 
 class RegisterSerializer(serializers.ModelSerializer):

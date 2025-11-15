@@ -253,6 +253,33 @@ class TranslateView(APIView):
         _l1_set(cache_key, translation)
         return Response({"translation": translation}, status=201)
 
+class UserProfileView(APIView):
+    """GET current user's profile; PATCH display_name once."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        profile = getattr(request.user, "profile", None)
+        if not profile:
+            return Response({"display_name": None})
+        from .serializers import UserProfileSerializer
+        return Response(UserProfileSerializer(profile).data)
+
+    def patch(self, request):
+        profile = getattr(request.user, "profile", None)
+        if not profile:
+            # Create a profile on-the-fly if it does not exist (e.g., legacy user)
+            from .models import UserProfile
+            profile = UserProfile.objects.create(user=request.user)
+        if profile.display_name:
+            return Response({"error": "Username already set"}, status=400)
+        from .serializers import UserProfileSerializer
+        ser = UserProfileSerializer(profile, data=request.data, partial=True)
+        ser.is_valid(raise_exception=True)
+        ser.save()
+        return Response(ser.data)
+
+
 class HistoryListView(generics.ListAPIView):
     serializer_class = TranslationSerializer
     permission_classes = [permissions.IsAuthenticated]

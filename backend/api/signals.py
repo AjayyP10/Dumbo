@@ -1,4 +1,4 @@
-from django.contrib.auth import user_logged_in, user_login_failed
+from django.contrib.auth import user_logged_in, user_login_failed, get_user_model
 from django.dispatch import receiver
 from django.utils import timezone
 from django.contrib.auth.models import AnonymousUser
@@ -50,3 +50,11 @@ def log_failed_login(sender, credentials, request, **kwargs):
         success=False,
         timestamp=timezone.now(),
     )
+
+
+# Automatically create a UserProfile when a new User instance is created.
+@receiver(post_save, sender=get_user_model())
+def create_user_profile(sender, instance, created, **kwargs):
+    if created:
+        from .models import UserProfile
+        UserProfile.objects.get_or_create(user=instance)

@@ -7,6 +7,7 @@ import "./i18n";
 import App from "./App";
 import Login from "./pages/Login";
 import OAuthComplete from "./pages/OAuthComplete";
+import ChooseUsername from "./pages/ChooseUsername";
 import Register from "./pages/Register";
 import Translate from "./pages/Translate";
 import History from "./pages/History";
@@ -40,6 +41,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Route
           path="/oauth-complete"
           element={<OAuthComplete />}
+        />
+        <Route
+          path="/welcome"
+          element={<PrivateRoute><ChooseUsername /></PrivateRoute>}
         />
       </Routes>
     </BrowserRouter>
