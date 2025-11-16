@@ -39,6 +39,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "social_django.middleware.SocialAuthExceptionMiddleware",
 ]
 
 ROOT_URLCONF = "backend.dumbo.urls"
@@ -108,6 +109,7 @@ SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = os.getenv("GOOGLE_CLIENT_ID")
 SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 SOCIAL_AUTH_LOGIN_REDIRECT_URL = "/api/oauth/google/jwt/"
 # After social-auth completes OAuth handshake, redirect here to issue JWT tokens
+SOCIAL_AUTH_LOGIN_ERROR_URL = "/api/oauth/error/"
 # If running behind HTTPS proxy (Render), tell social-auth to assume HTTPS
 # Use HTTPS redirects only in production (Render)
 SOCIAL_AUTH_REDIRECT_IS_HTTPS = not DEBUG
@@ -160,4 +162,7 @@ CELERY_TIMEZONE = "UTC"
 # Security
 SECURE_SSL_REDIRECT = not DEBUG
 SESSION_COOKIE_SECURE = not DEBUG
+# Ensure cookies are sent on first-party top-level navigations such as the OAuth
+# redirect flow while still protecting against CSRF in cross-site requests.
+SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SECURE = not DEBUG

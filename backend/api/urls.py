@@ -14,6 +14,7 @@ from .views import (
     UserProfileView,
     DeleteAccountView,
     LogoutView,
+    OAuthErrorView,
 )
 
 urlpatterns = [
@@ -30,5 +31,6 @@ urlpatterns = [
     path("delete-account/", DeleteAccountView.as_view(), name="delete_account"),
     path("logout/", LogoutView.as_view(), name="logout"),
     path("export-history/", ExportHistoryView.as_view(), name="export_history"),
+    path("oauth/error/", OAuthErrorView.as_view(), name="oauth_error"),
     path("tasks/<uuid:task_id>/", TaskStatusView.as_view(), name="task_status"),
 ]

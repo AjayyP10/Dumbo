@@ -18,6 +18,11 @@ from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.authentication import SessionAuthentication
+
+# Custom auth class to allow CSRF-exempt session-based requests (e.g., /api/logout/)
+class CsrfExemptSessionAuthentication(SessionAuthentication):
+    def enforce_csrf(self, request):
+        return  # Skip CSRF checks so the view can remain @csrf_exempt while using sessions
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.views import APIView
@@ -381,7 +386,7 @@ class LogoutView(APIView):
     """
 
     permission_classes = [permissions.AllowAny]
-    authentication_classes = [SessionAuthentication]
+    authentication_classes = [CsrfExemptSessionAuthentication]
 
     
 
@@ -408,6 +413,16 @@ class DeleteAccountView(APIView):
         user.delete()
         # If we reach here, deletion succeeded
         return Response({"detail": f"User '{username}' and related data deleted."}, status=204)
+
+
+class OAuthErrorView(APIView):
+    """Return a JSON error when OAuth association fails (e.g., already linked)."""
+
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        message = request.GET.get("message", "OAuth error")
+        return Response({"error": message}, status=400)
 
 
 class TaskStatusView(APIView):

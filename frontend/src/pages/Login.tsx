@@ -53,6 +53,13 @@ export default function Login() {
                 // Clear any client-side cached username and server-side session to avoid
                 // leaking the previous Google account’s profile when switching users.
                 localStorage.removeItem("username");
+                // Proactively clear any social-auth cookies that Django may have set
+                document.cookie.split(";").forEach((c) => {
+                  const [name] = c.trim().split("=");
+                  if (name.startsWith("social-auth")) {
+                    document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+                  }
+                });
                 try {
                   await fetch(`${API_URL}/api/logout/`, { method: "POST", credentials: "include" });
                 } catch (_) {
