@@ -48,8 +48,10 @@ export default function Login() {
             >
               Login
             </button>
-            <a
-              onClick={async () => {
+            <button
+              type="button"
+              onClick={async (e) => {
+                e.preventDefault();
                 // Clear any client-side cached username and server-side session to avoid
                 // leaking the previous Google account’s profile when switching users.
                 localStorage.removeItem("username");
@@ -65,8 +67,9 @@ export default function Login() {
                 } catch (_) {
                   /* network errors can be ignored – we clear localStorage anyway */
                 }
+                // After ensuring server-side logout, redirect to Google OAuth login
+                window.location.href = `${API_URL}/api/oauth/login/google-oauth2/?prompt=select_account`;
               }}
-              href={`${API_URL}/api/oauth/login/google-oauth2/?prompt=select_account` }
               className="px-3 py-2 border border-gray-300 rounded bg-white hover:bg-gray-100 flex items-center justify-center"
             >
               {/* Google logo */}
@@ -76,7 +79,7 @@ export default function Login() {
                 <path fill="#FBBC05" d="M122.7 326.6c-10.1-29.7-10.1-61.4 0-91.1V166.7H34.4c-36.8 73.3-36.8 160.8 0 234.1l88.3-69.5z"/>
                 <path fill="#EA4335" d="M272.1 107.5c39.3-.6 75.8 14 103.8 40.9l77.8-77.8C415.1 24 347.5 0 272.1 0 169.5 0 78.4 61.6 34.4 149l88.3 69.5c20.9-62.5 79.8-109.5 149.4-109.5z"/>
               </svg>
-            </a>
+            </button>
           </div>
         </form>
         {/* Google OAuth login */}

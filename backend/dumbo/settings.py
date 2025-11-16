@@ -9,7 +9,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # ENV
 load_dotenv(BASE_DIR / ".env")  # optional local .env
 SECRET_KEY = os.getenv("SECRET_KEY", "unsafe-secret-for-dev")
-DEBUG = os.getenv("DEBUG", "True") == "True"
+# Default to production-safe DEBUG=False unless explicitly overridden
+DEBUG = os.getenv("DEBUG", "False") == "True"
 
 ALLOWED_HOSTS = ["localhost", "127.0.0.1", os.getenv("RENDER_EXTERNAL_HOSTNAME", "")]
 CSRF_TRUSTED_ORIGINS = [f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME', '')}"]
@@ -166,5 +167,8 @@ SECURE_SSL_REDIRECT = not DEBUG
 SESSION_COOKIE_SECURE = not DEBUG
 # Ensure cookies are sent on first-party top-level navigations such as the OAuth
 # redirect flow while still protecting against CSRF in cross-site requests.
-SESSION_COOKIE_SAMESITE = "Lax"
+# Allow cross-site XHR POSTs (logout) from the frontend domain to backend in production
+SESSION_COOKIE_SAMESITE = "None" if not DEBUG else "Lax"
 CSRF_COOKIE_SECURE = not DEBUG
+# Align SameSite policy for CSRF cookie to avoid mismatch warnings
+CSRF_COOKIE_SAMESITE = "None" if not DEBUG else "Lax"
