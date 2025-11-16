@@ -110,6 +110,8 @@ SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 SOCIAL_AUTH_LOGIN_REDIRECT_URL = "/api/oauth/google/jwt/"
 # After social-auth completes OAuth handshake, redirect here to issue JWT tokens
 SOCIAL_AUTH_LOGIN_ERROR_URL = "/api/oauth/error/"
+# Ensure exceptions are passed to middleware instead of bubbling up as 500
+SOCIAL_AUTH_RAISE_EXCEPTIONS = False
 # If running behind HTTPS proxy (Render), tell social-auth to assume HTTPS
 # Use HTTPS redirects only in production (Render)
 SOCIAL_AUTH_REDIRECT_IS_HTTPS = not DEBUG
