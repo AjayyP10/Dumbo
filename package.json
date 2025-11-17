@@ -35,9 +35,8 @@
       "python -m isort",
       "python -m flake8"
     ],
-    "frontend/src/**/*.{ts,tsx}": [
-      "cd frontend; npm run lint -- --fix"
-    ]
+    "frontend/src/**/*.{ts,tsx}": "npx --prefix frontend eslint --fix",
+    "frontend/**/*.{ts,tsx,js,jsx,json,css,md,html}": "npx --prefix frontend prettier --write"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.7",
