@@ -6,18 +6,36 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('api', '0003_translation_source_lang_translation_target_lang_and_more'),
+        ("api", "0003_translation_source_lang_translation_target_lang_and_more"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='translation',
-            name='source_lang',
-            field=models.CharField(choices=[('en', 'English'), ('de', 'German'), ('es', 'Spanish'), ('fr', 'French')], default='en', max_length=5),
+            model_name="translation",
+            name="source_lang",
+            field=models.CharField(
+                choices=[
+                    ("en", "English"),
+                    ("de", "German"),
+                    ("es", "Spanish"),
+                    ("fr", "French"),
+                ],
+                default="en",
+                max_length=5,
+            ),
         ),
         migrations.AlterField(
-            model_name='translation',
-            name='target_lang',
-            field=models.CharField(choices=[('en', 'English'), ('de', 'German'), ('es', 'Spanish'), ('fr', 'French')], default='de', max_length=5),
+            model_name="translation",
+            name="target_lang",
+            field=models.CharField(
+                choices=[
+                    ("en", "English"),
+                    ("de", "German"),
+                    ("es", "Spanish"),
+                    ("fr", "French"),
+                ],
+                default="de",
+                max_length=5,
+            ),
         ),
     ]

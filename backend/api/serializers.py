@@ -1,6 +1,8 @@
-from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from rest_framework import serializers
+
 from .models import Translation, UserLoginLog, UserProfile
+
 
 class TranslationSerializer(serializers.ModelSerializer):
     class Meta:
@@ -15,6 +17,7 @@ class TranslationSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = ["id", "output_text", "created_at"]
+
 
 class UserLoginLogSerializer(serializers.ModelSerializer):
     class Meta:

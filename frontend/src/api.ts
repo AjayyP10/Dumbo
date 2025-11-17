@@ -34,7 +34,9 @@ api.interceptors.response.use(
         return Promise.reject(error);
       }
       try {
-        const res = await axios.post(`${API_URL}/api/token/refresh/`, { refresh });
+        const res = await axios.post(`${API_URL}/api/token/refresh/`, {
+          refresh,
+        });
         const newAccess = res.data.access;
         const newRefresh = res.data.refresh || refresh; // use rotated token if provided
         saveTokens(newAccess, newRefresh);
@@ -50,5 +52,5 @@ api.interceptors.response.use(
       }
     }
     return Promise.reject(error);
-  }
+  },
 );

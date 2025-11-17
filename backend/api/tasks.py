@@ -1,14 +1,37 @@
-import os, asyncio, httpx
+import asyncio
+import os
+
+import httpx
 from celery import shared_task
-from django.core.cache import cache
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 
+from .cache_utils import _compress, _l1_set, chunk_get, chunk_set
 from .models import Translation
-from .cache_utils import _compress, _l1_set, make_cache_key, chunk_get, chunk_set
-from .views import SYSTEM_PROMPT, _build_prompt, _split_into_chunks, OPENROUTER_URL, MODEL
+from .views import (
+    MODEL,
+    OPENROUTER_URL,
+    SYSTEM_PROMPT,
+    _build_prompt,
+    _split_into_chunks,
+)
 
-@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={"max_retries": 3})
-def translate_text_task(self, user_id: int, text: str, source_lang: str, target_lang: str, level: str, cache_key: str):
+
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+)
+def translate_text_task(
+    self,
+    user_id: int,
+    text: str,
+    source_lang: str,
+    target_lang: str,
+    level: str,
+    cache_key: str,
+):
     """
     Heavy-weight translation task executed in Celery worker.
     Returns the final translation string (also cached & persisted).

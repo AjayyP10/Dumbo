@@ -1,7 +1,7 @@
 // TypeScript declaration stubs for Vite PWA virtual modules.
 // This quiets “Cannot find module 'virtual:pwa-register'” errors coming from main.tsx.
 
-declare module 'virtual:pwa-register' {
+declare module "virtual:pwa-register" {
   export interface RegisterSWOptions {
     immediate?: boolean;
     onOfflineReady?: () => void;
@@ -13,10 +13,10 @@ declare module 'virtual:pwa-register' {
    * Returns a function that can be called to manually trigger an update check.
    */
   export function registerSW(
-    options?: RegisterSWOptions
+    options?: RegisterSWOptions,
   ): (reloadPage?: boolean) => void;
 }
 
-declare module 'virtual:pwa-register/*' {
-  export * from 'virtual:pwa-register';
+declare module "virtual:pwa-register/*" {
+  export * from "virtual:pwa-register";
 }

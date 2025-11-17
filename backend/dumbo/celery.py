@@ -1,4 +1,6 @@
 import os
+import platform
+
 from celery import Celery
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "backend.dumbo.settings")
@@ -7,7 +9,6 @@ app = Celery("dumbo")
 app.config_from_object("django.conf:settings", namespace="CELERY")
 app.autodiscover_tasks()
 
-import platform
 
 # On Windows, the default 'prefork' pool is not supported and can raise
 # `PermissionError: [WinError 5] Access is denied` due to missing semaphore

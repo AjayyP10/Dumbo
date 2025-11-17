@@ -1,52 +1,56 @@
-import os, json, hashlib, time
+import os
+import time
+
 import httpx
-from asgiref.sync import sync_to_async
-from django.core.cache import cache
-
-# Import shared caching helpers
-from .cache_utils import (
-    _l1_get,
-    _l1_set,
-    _l1_delete,
-    _compress,
-    _decompress,
-    make_cache_key,
-    chunk_get,
-    chunk_set,
-)
-from rest_framework import generics, permissions
-from rest_framework.response import Response
-from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.authentication import SessionAuthentication
-
-# Custom auth class to allow CSRF-exempt session-based requests (e.g., /api/logout/)
-class CsrfExemptSessionAuthentication(SessionAuthentication):
-    def enforce_csrf(self, request):
-        return  # Skip CSRF checks so the view can remain @csrf_exempt while using sessions
+import csv
+from celery.result import AsyncResult
+from django.contrib.auth import get_user_model
+from django.http import HttpResponse, HttpResponseRedirect
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.views import APIView
-from django.http import HttpResponse, HttpResponseRedirect
-import csv
-from django.contrib.auth import get_user_model
-from django.utils import timezone
-from rest_framework_simplejwt.views import TokenObtainPairView
-from celery.result import AsyncResult
+from django.core.cache import cache
+from rest_framework import generics, permissions
+from rest_framework.authentication import SessionAuthentication
+from rest_framework.response import Response
+from rest_framework_simplejwt.tokens import RefreshToken
+
 from .models import Translation, UserLoginLog
 from .serializers import (
-    TranslationSerializer,
     RegisterSerializer,
+    TranslationSerializer,
     UserLoginLogSerializer,
 )
-from .permissions import IsOwner
+
+# Import shared caching helpers
+from .cache_utils import (
+    _compress,
+    _decompress,
+    _l1_get,
+    _l1_set,
+    chunk_get,
+    chunk_set,
+    make_cache_key,
+)
+
+
+# Custom auth class to allow CSRF-exempt session-based requests (e.g., /api/logout/)
+
+class CsrfExemptSessionAuthentication(SessionAuthentication):
+    def enforce_csrf(self, request):
+        return  # Skip CSRF; view stays @csrf_exempt
+
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 MODEL = "google/gemma-3-27b-it:free"
 
 # --- Prompt helpers (leaner prompts & optional chunking) --------------------
-SYSTEM_PROMPT = "You are a professional translator. Reply ONLY with the translated text."
+SYSTEM_PROMPT = (
+    "You are a professional translator. Reply ONLY with the translated text."
+)
 
 MAX_CHARS_PER_REQUEST = 1500  # safety margin vs LLM context length
+
 
 def _build_prompt(text: str, src: str, tgt: str, level: str = "") -> str:
     """Return a concise translation prompt for the LLM."""
@@ -74,6 +78,7 @@ def _split_into_chunks(text: str, max_chars: int = MAX_CHARS_PER_REQUEST):
         chunks.append(current.strip())
     return chunks
 
+
 class TranslateView(APIView):
     """Translate input text to German at a given CEFR level.
 
@@ -92,7 +97,10 @@ class TranslateView(APIView):
         """Synchronous GET handler (DRF browsable API help)."""
         return Response(
             {
-                "message": "Send a POST with {input_text, level} and Bearer token to receive a translation.",
+                "message": (
+                    "Send a POST with {input_text, level} and Bearer token "
+                    "to receive a translation."
+                ),
                 "allowed_levels": ["A1", "A2", "B1", "B2"],
             }
         )
@@ -128,8 +136,11 @@ class TranslateView(APIView):
         cache_key = make_cache_key(text, source_lang, target_lang, level)
 
         # --- Optionally offload long or explicitly async requests to Celery ---
-        if request.query_params.get("async") == "1" or len(text) > int(os.getenv("ASYNC_TRANSLATE_THRESHOLD", 3000)):
+        if request.query_params.get("async") == "1" or len(text) > int(
+            os.getenv("ASYNC_TRANSLATE_THRESHOLD", 3000)
+        ):
             from .tasks import translate_text_task
+
             task = translate_text_task.delay(
                 user_id=request.user.id,
                 text=text,
@@ -168,7 +179,9 @@ class TranslateView(APIView):
         )
         if existing:
             # backfill cache for next time
-            cache.set(cache_key, existing.output_text, int(os.getenv("CACHE_TTL", 3600)))
+            cache.set(
+                cache_key, existing.output_text, int(os.getenv("CACHE_TTL", 3600))
+            )
             return Response({"translation": existing.output_text}, status=200)
 
         headers = {
@@ -208,7 +221,9 @@ class TranslateView(APIView):
                 backoff = 2
                 while True:
                     try:
-                        llm_resp = client.post(OPENROUTER_URL, json=payload, headers=headers)
+                        llm_resp = client.post(
+                            OPENROUTER_URL, json=payload, headers=headers
+                        )
                         if llm_resp.status_code == 429 and retries < 3:
                             retries += 1
                             ra = llm_resp.headers.get("Retry-After")
@@ -233,12 +248,32 @@ class TranslateView(APIView):
                             backoff = min(backoff * 2, 30)
                             continue
                         if e.response.status_code == 429:
-                            return Response({"error": "Upstream rate limit still exceeded. Please try later."}, status=429)
-                        return Response({"error": str(e)}, status=e.response.status_code)
+                            return Response(
+                                {
+                                    "error": (
+                                        "Upstream rate limit still exceeded. "
+                                        "Please try later."
+                                    )
+                                },
+                                status=429,
+                            )
+                        return Response(
+                            {"error": str(e)}, status=e.response.status_code
+                        )
                     except httpx.RequestError:
-                        return Response({"error": "Upstream translation service unavailable. Please try later."}, status=503)
+                        return Response(
+                            {
+                                "error": (
+                                    "Upstream translation service unavailable. "
+                                    "Please try later."
+                                )
+                            },
+                            status=503,
+                        )
 
-                translated_chunk = llm_resp.json()["choices"][0]["message"]["content"].strip()
+                translated_chunk = llm_resp.json()["choices"][0]["message"][
+                    "content"
+                ].strip()
                 chunk_set(chunk, source_lang, target_lang, level, translated_chunk)
                 translations_accum.append(translated_chunk)
 
@@ -260,6 +295,7 @@ class TranslateView(APIView):
         _l1_set(cache_key, translation)
         return Response({"translation": translation}, status=201)
 
+
 class UserProfileView(APIView):
     """GET current user's profile; PATCH display_name once."""
 
@@ -270,6 +306,7 @@ class UserProfileView(APIView):
         if not profile:
             return Response({"display_name": None})
         from .serializers import UserProfileSerializer
+
         return Response(UserProfileSerializer(profile).data)
 
     def patch(self, request):
@@ -277,10 +314,12 @@ class UserProfileView(APIView):
         if not profile:
             # Create a profile on-the-fly if it does not exist (e.g., legacy user)
             from .models import UserProfile
+
             profile = UserProfile.objects.create(user=request.user)
         if profile.display_name:
             return Response({"error": "Username already set"}, status=400)
         from .serializers import UserProfileSerializer
+
         ser = UserProfileSerializer(profile, data=request.data, partial=True)
         ser.is_valid(raise_exception=True)
         ser.save()
@@ -319,30 +358,39 @@ class ExportHistoryView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        translations = Translation.objects.filter(user=request.user).order_by("-created_at")
+        translations = Translation.objects.filter(user=request.user).order_by(
+            "-created_at"
+        )
         # Create the HttpResponse object with CSV headers
         response = HttpResponse(content_type="text/csv")
-        response["Content-Disposition"] = 'attachment; filename="translation_history.csv"'
+        response["Content-Disposition"] = (
+            'attachment; filename="translation_history.csv"'
+        )
 
         writer = csv.writer(response)
-        writer.writerow([
-            "Date",
-            "Source Language",
-            "Target Language",
-            "Level",
-            "Input Text",
-            "Output Text",
-        ])
+        writer.writerow(
+            [
+                "Date",
+                "Source Language",
+                "Target Language",
+                "Level",
+                "Input Text",
+                "Output Text",
+            ]
+        )
         for t in translations:
-            writer.writerow([
-                t.created_at.isoformat(sep=" ", timespec="seconds"),
-                t.source_lang,
-                t.target_lang,
-                t.level or "-",
-                t.input_text.replace("\n", " "),
-                t.output_text.replace("\n", " "),
-            ])
+            writer.writerow(
+                [
+                    t.created_at.isoformat(sep=" ", timespec="seconds"),
+                    t.source_lang,
+                    t.target_lang,
+                    t.level or "-",
+                    t.input_text.replace("\n", " "),
+                    t.output_text.replace("\n", " "),
+                ]
+            )
         return response
+
 
 class GoogleAuthComplete(APIView):
     """Custom view that is called after Google OAuth completes.
@@ -370,7 +418,8 @@ class GoogleAuthComplete(APIView):
         # they are never sent to the server via HTTP referer or logs.
         frontend_base = os.getenv("FRONTEND_URL", "http://localhost:5173")
         redirect_url = (
-            f"{frontend_base}/oauth-complete#access={str(refresh.access_token)}&refresh={str(refresh)}"
+            f"{frontend_base}/oauth-complete#access={str(refresh.access_token)}"
+            f"&refresh={str(refresh)}"
         )
         return HttpResponseRedirect(redirect_url)
 
@@ -388,10 +437,9 @@ class LogoutView(APIView):
     permission_classes = [permissions.AllowAny]
     authentication_classes = [CsrfExemptSessionAuthentication]
 
-    
-
     def post(self, request):
         from django.contrib.auth import logout as django_logout
+
         django_logout(request)
         return Response({"detail": "Logged out."})
 
@@ -412,7 +460,9 @@ class DeleteAccountView(APIView):
         username = user.username
         user.delete()
         # If we reach here, deletion succeeded
-        return Response({"detail": f"User '{username}' and related data deleted."}, status=204)
+        return Response(
+            {"detail": f"User '{username}' and related data deleted."}, status=204
+        )
 
 
 class OAuthErrorView(APIView):
@@ -454,6 +504,7 @@ class TaskStatusView(APIView):
             return None
         # Celery backends may return either datetime or float timestamps
         from datetime import datetime
+
         from django.utils import timezone
 
         # If it's already a datetime, ensure it is aware & ISO-format it
@@ -463,7 +514,11 @@ class TaskStatusView(APIView):
             return value.isoformat()
         # Fallback: treat as epoch seconds
         try:
-            return datetime.utcfromtimestamp(float(value)).replace(tzinfo=timezone.utc).isoformat()
+            return (
+                datetime.utcfromtimestamp(float(value))
+                .replace(tzinfo=timezone.utc)
+                .isoformat()
+            )
         except Exception:
             return None
 

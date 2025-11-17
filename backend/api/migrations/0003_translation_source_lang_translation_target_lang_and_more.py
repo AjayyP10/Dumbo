@@ -6,28 +6,40 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('api', '0002_alter_translation_id_userloginlog'),
+        ("api", "0002_alter_translation_id_userloginlog"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='translation',
-            name='source_lang',
-            field=models.CharField(choices=[('en', 'English'), ('de', 'German')], default='en', max_length=5),
+            model_name="translation",
+            name="source_lang",
+            field=models.CharField(
+                choices=[("en", "English"), ("de", "German")],
+                default="en",
+                max_length=5,
+            ),
         ),
         migrations.AddField(
-            model_name='translation',
-            name='target_lang',
-            field=models.CharField(choices=[('en', 'English'), ('de', 'German')], default='de', max_length=5),
+            model_name="translation",
+            name="target_lang",
+            field=models.CharField(
+                choices=[("en", "English"), ("de", "German")],
+                default="de",
+                max_length=5,
+            ),
         ),
         migrations.AlterField(
-            model_name='translation',
-            name='input_text',
+            model_name="translation",
+            name="input_text",
             field=models.TextField(),
         ),
         migrations.AlterField(
-            model_name='translation',
-            name='level',
-            field=models.CharField(blank=True, choices=[('A1', 'A1'), ('A2', 'A2'), ('B1', 'B1'), ('B2', 'B2')], max_length=2),
+            model_name="translation",
+            name="level",
+            field=models.CharField(
+                blank=True,
+                choices=[("A1", "A1"), ("A2", "A2"), ("B1", "B1"), ("B2", "B2")],
+                max_length=2,
+            ),
         ),
     ]

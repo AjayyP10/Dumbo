@@ -4,6 +4,7 @@ from django.utils import timezone
 
 User = get_user_model()
 
+
 class Translation(models.Model):
     LEVEL_CHOICES = [(lvl, lvl) for lvl in ["A1", "A2", "B1", "B2"]]
     LANG_CHOICES = [
@@ -13,7 +14,9 @@ class Translation(models.Model):
         ("fr", "French"),
     ]
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="translations")
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="translations"
+    )
     input_text = models.TextField()  # removed max_length to allow unlimited text
     output_text = models.TextField()
     # New language fields – default to English→German like before
@@ -32,7 +35,7 @@ class UserProfile(models.Model):
     """Stores additional info for a user such as chosen display name."""
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
-    # Display name chosen by the user after first Google login. Unique & optional until set.
+    # Display name chosen after Google login; unique when set.
     display_name = models.CharField(max_length=150, unique=True, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -56,4 +59,7 @@ class UserLoginLog(models.Model):
 
     def __str__(self):
         status = "Success" if self.success else "Failed"
-        return f"{self.user or 'Unknown user'} – {status} @ {self.timestamp:%Y-%m-%d %H:%M:%S}"
+        return (
+            f"{self.user or 'Unknown user'} – {status} @ "
+            f"{self.timestamp:%Y-%m-%d %H:%M:%S}"
+        )

@@ -37,18 +37,12 @@ export default function History() {
   }
 
   if (error) {
-    return (
-      <div className="text-red-600 text-center mt-8">
-        {error}
-      </div>
-    );
+    return <div className="text-red-600 text-center mt-8">{error}</div>;
   }
 
   if (items.length === 0) {
     return (
-      <div className="text-center text-gray-600 mt-8">
-        No translations yet.
-      </div>
+      <div className="text-center text-gray-600 mt-8">No translations yet.</div>
     );
   }
 

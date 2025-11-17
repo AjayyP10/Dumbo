@@ -1,5 +1,7 @@
 from django.contrib import admin
+
 from .models import Translation, UserLoginLog
+
 
 @admin.register(Translation)
 class TranslationAdmin(admin.ModelAdmin):
@@ -7,6 +9,7 @@ class TranslationAdmin(admin.ModelAdmin):
     search_fields = ("user__username", "input_text", "output_text")
     list_filter = ("level", "created_at")
     readonly_fields = ("created_at",)
+
 
 @admin.register(UserLoginLog)
 class UserLoginLogAdmin(admin.ModelAdmin):

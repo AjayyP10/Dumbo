@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { AxiosError } from "axios";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
 import { deleteAccount } from "../api";
@@ -32,7 +33,11 @@ export default function Navbar() {
   };
 
   const handleDelete = async () => {
-    if (!window.confirm("Are you sure you want to delete your account? This action cannot be undone.")) {
+    if (
+      !window.confirm(
+        "Are you sure you want to delete your account? This action cannot be undone.",
+      )
+    ) {
       return;
     }
     try {
@@ -40,8 +45,15 @@ export default function Navbar() {
       toast.success("Account deleted successfully");
       logout();
       navigate("/login", { replace: true });
-    } catch (err: any) {
-      toast.error(err?.response?.data?.detail || "Failed to delete account");
+    } catch (err: unknown) {
+      let msg: string | undefined;
+      if (typeof err === "object" && err) {
+        const axErr = err as AxiosError<{ detail?: string }>;
+        msg =
+          axErr.response?.data?.detail ??
+          (axErr as { message?: string }).message;
+      }
+      toast.error(msg || "Failed to delete account");
     }
   };
 
@@ -60,16 +72,27 @@ export default function Navbar() {
         </button>
         {isLoggedIn() && (
           <>
-            {location.pathname !== '/history' && (
-              <Link to="/history" className="mr-2 text-blue-600 dark:text-blue-400 hover:underline">
-                {t('history')}
+            {location.pathname !== "/history" && (
+              <Link
+                to="/history"
+                className="mr-2 text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                {t("history")}
               </Link>
             )}
-            <span className="mr-2 dark:text-gray-100">{t('hello', { name: getUsername() ?? 'User' })}</span>
-            <button onClick={handleLogout} className="text-blue-600 dark:text-blue-400">
-              {t('logout')}
+            <span className="mr-2 dark:text-gray-100">
+              {t("hello", { name: getUsername() ?? "User" })}
+            </span>
+            <button
+              onClick={handleLogout}
+              className="text-blue-600 dark:text-blue-400"
+            >
+              {t("logout")}
             </button>
-            <button onClick={handleDelete} className="text-red-600 dark:text-red-400">
+            <button
+              onClick={handleDelete}
+              className="text-red-600 dark:text-red-400"
+            >
               Delete Account
             </button>
           </>

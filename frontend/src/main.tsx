@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { registerSW } from 'virtual:pwa-register';
+import { registerSW } from "virtual:pwa-register";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./index.css";
 import "./i18n";
@@ -13,7 +13,6 @@ import Translate from "./pages/Translate";
 import History from "./pages/History";
 import LoginLogs from "./pages/LoginLogs";
 import { PrivateRoute, PublicOnly } from "./RouteGuards";
-import { isLoggedIn } from "./auth";
 
 // Register PWA service worker (only in production)
 if (import.meta.env.PROD) {
@@ -24,7 +23,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<PrivateRoute><App /></PrivateRoute>}>
+        <Route
+          path="/"
+          element={
+            <PrivateRoute>
+              <App />
+            </PrivateRoute>
+          }
+        >
           <Route index element={<Navigate to="/translate" />} />
           <Route path="translate" element={<Translate />} />
           <Route path="history" element={<History />} />
@@ -32,21 +38,30 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         </Route>
         <Route
           path="/login"
-          element={<PublicOnly><Login /></PublicOnly>}
+          element={
+            <PublicOnly>
+              <Login />
+            </PublicOnly>
+          }
         />
         <Route
           path="/register"
-          element={<PublicOnly><Register /></PublicOnly>}
+          element={
+            <PublicOnly>
+              <Register />
+            </PublicOnly>
+          }
         />
-        <Route
-          path="/oauth-complete"
-          element={<OAuthComplete />}
-        />
+        <Route path="/oauth-complete" element={<OAuthComplete />} />
         <Route
           path="/welcome"
-          element={<PrivateRoute><ChooseUsername /></PrivateRoute>}
+          element={
+            <PrivateRoute>
+              <ChooseUsername />
+            </PrivateRoute>
+          }
         />
       </Routes>
     </BrowserRouter>
-  </React.StrictMode>
+  </React.StrictMode>,
 );

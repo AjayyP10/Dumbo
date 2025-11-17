@@ -1,6 +1,5 @@
 import { describe, it } from "@jest/globals"; // use global expect with jest-dom matchers
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import TranslateButton from "../TranslateButton";
 
 describe("TranslateButton", () => {

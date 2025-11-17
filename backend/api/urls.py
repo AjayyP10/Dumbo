@@ -1,26 +1,29 @@
-from django.urls import path, include
+from django.urls import include, path
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
+
 from .views import (
-    TranslateView,
-    HistoryListView,
-    RegisterView,
-    LoginLogListView,
-    ExportHistoryView,
-    TaskStatusView,
-    GoogleAuthComplete,
-    UserProfileView,
     DeleteAccountView,
+    ExportHistoryView,
+    GoogleAuthComplete,
+    HistoryListView,
+    LoginLogListView,
     LogoutView,
     OAuthErrorView,
+    RegisterView,
+    TaskStatusView,
+    TranslateView,
+    UserProfileView,
 )
 
 urlpatterns = [
     path("oauth/", include("social_django.urls", namespace="social")),
     # After social-auth processes the callback it will redirect here to issue JWT tokens
-    path("oauth/google/jwt/", GoogleAuthComplete.as_view(), name="google_auth_complete"),
+    path(
+        "oauth/google/jwt/", GoogleAuthComplete.as_view(), name="google_auth_complete"
+    ),
     path("token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("translate/", TranslateView.as_view(), name="translate"),

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { AxiosError } from "axios";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { getUsername } from "../auth";
@@ -44,8 +45,18 @@ export default function ChooseUsername() {
       await api.patch("profile/", { display_name: username.trim() });
       localStorage.setItem("username", username.trim());
       navigate("/translate", { replace: true });
-    } catch (err: any) {
-      const msg = err?.response?.data?.display_name?.[0] || err?.response?.data?.error || "Failed to set username";
+    } catch (err: unknown) {
+      let msg = "Failed to set username";
+      if (typeof err === "object" && err) {
+        const axErr = err as AxiosError<{
+          display_name?: string[];
+          error?: string;
+        }>;
+        msg =
+          axErr.response?.data?.display_name?.[0] ??
+          axErr.response?.data?.error ??
+          msg;
+      }
       setError(msg);
     }
   };

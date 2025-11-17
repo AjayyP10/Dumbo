@@ -40,11 +40,7 @@ export default function LoginLogs() {
   }
 
   if (logs.length === 0) {
-    return (
-      <p className="text-gray-600 mt-8 text-center">
-        No login attempts.
-      </p>
-    );
+    return <p className="text-gray-600 mt-8 text-center">No login attempts.</p>;
   }
 
   return (

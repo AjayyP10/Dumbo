@@ -1,4 +1,4 @@
-import { PropsWithChildren, ReactNode } from "react";
+import { PropsWithChildren } from "react";
 
 interface Props {
   loading: boolean;
@@ -28,7 +28,8 @@ export default function OutputCard({
             onClick={() => {
               const range = document.createRange();
               range.selectNodeContents(
-                document.getSelection()?.anchorNode?.parentElement || document.body
+                document.getSelection()?.anchorNode?.parentElement ||
+                  document.body,
               );
             }}
           >
