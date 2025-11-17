@@ -30,7 +30,8 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install dependencies and lint frontend
+      - name: Install frontend dependencies and lint
         run: |
+          cd frontend
           npm ci
           npm run lint
