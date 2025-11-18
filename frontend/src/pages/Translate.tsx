@@ -30,12 +30,13 @@ export default function Translate() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Debounce the text input for the query
-  const debouncedText = useDebounce(text, 500);
+  // State for the text that should actually be translated (manual trigger)
+  const [queryText, setQueryText] = useState("");
 
-  // Use the React Query hook
+  // Use the React Query hook with the manually triggered text
   const { data, isLoading, error, isFetching } = useTranslation(
-    debouncedText,
+    queryText,
+    sourceLang,
     targetLang,
     level,
   );
@@ -81,11 +82,11 @@ export default function Translate() {
 
   // Save to history when we get a new valid translation
   useEffect(() => {
-    if (data?.translation && debouncedText) {
+    if (data?.translation && queryText) {
       // Avoid saving if it's already the most recent item
       if (
         history.length > 0 &&
-        history[0].text === debouncedText &&
+        history[0].text === queryText &&
         history[0].translation === data.translation
       ) {
         return;
@@ -93,14 +94,14 @@ export default function Translate() {
 
       saveHistory({
         id: crypto.randomUUID(),
-        text: debouncedText,
+        text: queryText,
         level,
         translation: data.translation,
         timestamp: Date.now(),
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, debouncedText, level]);
+  }, [data, queryText, level]);
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const outputTextRef = useRef<HTMLParagraphElement | null>(null);
@@ -109,6 +110,12 @@ export default function Translate() {
   useEffect(() => {
     textareaRef.current?.focus();
   }, []);
+
+  const handleTranslate = () => {
+    if (text.trim()) {
+      setQueryText(text);
+    }
+  };
 
   return (
     <>
@@ -145,9 +152,14 @@ export default function Translate() {
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                      e.preventDefault();
+                      handleTranslate();
+                    }
                     if (e.key === "Escape") {
                       e.preventDefault();
                       setText("");
+                      setQueryText("");
                       setCopied(false);
                     }
                   }}
@@ -271,11 +283,25 @@ export default function Translate() {
                   </div>
                 )}
 
-                {/* Action buttons */}
+                {/* Translate Button */}
+                <button
+                  type="button"
+                  onClick={handleTranslate}
+                  disabled={!text || isFetching}
+                  className={`flex-1 px-6 py-3 rounded-xl font-bold text-white shadow-lg transition-all duration-300 transform hover:scale-105 active:scale-95 ${!text || isFetching
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+                    }`}
+                >
+                  {isFetching ? "Translating..." : "Translate"}
+                </button>
+
+                {/* Clear Button */}
                 <button
                   type="button"
                   onClick={() => {
                     setText("");
+                    setQueryText("");
                     setCopied(false);
                     textareaRef.current?.focus();
                   }}
@@ -364,7 +390,7 @@ export default function Translate() {
                         Your translated text will appear here
                       </p>
                       <p className="text-sm text-center mt-2">
-                        Type to translate automatically
+                        Click Translate to see the result
                       </p>
                     </div>
                   )}

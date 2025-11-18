@@ -111,8 +111,8 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.AnonRateThrottle",
     ),
     "DEFAULT_THROTTLE_RATES": {
-        "user": os.getenv("THROTTLE_RATE_USER", "20/min"),
-        "anon": os.getenv("THROTTLE_RATE_ANON", "10/min"),
+        "user": os.getenv("THROTTLE_RATE_USER", "100/min"),
+        "anon": os.getenv("THROTTLE_RATE_ANON", "50/min"),
     },
 }
 
