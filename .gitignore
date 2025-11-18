@@ -5,6 +5,7 @@ db.sqlite3
 
 # Node
 node_modules/
+frontend/dist/
 
 # Env
 *.env

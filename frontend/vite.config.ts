@@ -2,12 +2,24 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 import path from "path";
+import compression from "vite-plugin-compression";
+import { visualizer } from "rollup-plugin-visualizer";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   return {
     plugins: [
       react(),
+      // Compress assets (gzip)
+      compression({
+        algorithm: "gzip",
+        ext: ".gz",
+      }),
+      // Compress assets (brotli)
+      compression({
+        algorithm: "brotliCompress",
+        ext: ".br",
+      }),
       VitePWA({
         registerType: "autoUpdate",
         includeAssets: [
@@ -41,6 +53,14 @@ export default defineConfig(({ mode }) => {
           ],
         },
       }),
+      // Bundle analyzer (only when mode is 'analyze')
+      mode === "analyze" &&
+      visualizer({
+        open: true,
+        filename: "dist/stats.html",
+        gzipSize: true,
+        brotliSize: true,
+      }),
     ],
     resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
     server: {
@@ -62,6 +82,8 @@ export default defineConfig(({ mode }) => {
           },
         },
       },
+      // Inline small assets to save requests, but keep larger ones separate
+      assetsInlineLimit: 4096,
     },
   };
 });

@@ -1,8 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useTransition } from "react";
+// Cache for translation results to avoid duplicate API calls
+const translationCache = new Map<string, string>();
 import type { AxiosError } from "axios";
 import { useTranslation } from "react-i18next";
 import { api } from "../api";
 import { type HistoryItem } from "../components/HistorySidebar";
+import HistorySidebar from "../components/HistorySidebar";
 
 function SpinnerIcon() {
   return (
@@ -35,6 +38,7 @@ export default function Translate() {
   const [level, setLevel] = useState("A1");
   const [sourceLang, setSourceLang] = useState("en");
   const [targetLang, setTargetLang] = useState("de");
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   // Supported languages (code + i18n key)
   const LANGS = [
@@ -81,14 +85,26 @@ export default function Translate() {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const outputTextRef = useRef<HTMLParagraphElement | null>(null);
 
-  // Auto-focus textarea on mount
-  useEffect(() => {
-    textareaRef.current?.focus();
-  }, []);
+  const [isPending, startTransition] = useTransition();
+
+  // Debounce timer reference
+  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+
+  // Helper to generate cache key
+  const cacheKey = (txt: string) => `${txt}|${sourceLang}|${targetLang}|${level}`;
 
   const translate = async () => {
     const trimmed = text.trim();
     if (!trimmed) return;
+
+    // Check cache first
+    const key = cacheKey(trimmed);
+    if (translationCache.has(key)) {
+      setOutput(translationCache.get(key)!);
+      // focus back to textarea for quick edits
+      setTimeout(() => textareaRef.current?.focus(), 0);
+      return;
+    }
 
     setError(null);
     setLoading(true);
@@ -99,13 +115,17 @@ export default function Translate() {
         source_lang: sourceLang,
         target_lang: targetLang,
       });
-      setOutput(res.data.translation);
+      const translation = res.data.translation;
+      // Store in cache
+      translationCache.set(key, translation);
+      // Use transition for low‑priority UI update
+      startTransition(() => setOutput(translation));
       // store in history
       saveHistory({
         id: crypto.randomUUID(),
         text: trimmed,
         level,
-        translation: res.data.translation,
+        translation,
         timestamp: Date.now(),
       });
       // focus back to textarea for quick edits
@@ -125,12 +145,36 @@ export default function Translate() {
     }
   };
 
-  // Reset "Copied" label after 2 seconds
+  // Debounced wrapper for translate (used on Ctrl+Enter)
+  const debouncedTranslate = () => {
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      translate();
+    }, 300);
+  };
+
+  // Idle‑time pre‑fetch (example: warm up cache for recent history)
   useEffect(() => {
-    if (!copied) return;
-    const t = setTimeout(() => setCopied(false), 2000);
-    return () => clearTimeout(t);
-  }, [copied]);
+    if ("requestIdleCallback" in window) {
+      (window as any).requestIdleCallback(() => {
+        // Pre‑populate cache with recent translations (if any)
+        history.slice(0, 5).forEach((item) => {
+          const key = `${item.text}|${sourceLang}|${targetLang}|${item.level ?? level}`;
+          if (!translationCache.has(key)) {
+            translationCache.set(key, item.translation);
+          }
+        });
+      });
+    }
+  }, []);
+
+  // Auto-focus textarea on mount
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, []);
+
+  // Update keydown handler to use debouncedTranslate
+  // (will replace the existing onKeyDown inline code)
 
   return (
     <>
@@ -146,6 +190,12 @@ export default function Translate() {
             <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
               Translate
             </h1>
+            <button
+              onClick={() => setIsHistoryOpen(true)}
+              className="px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 dark:text-indigo-400 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+            >
+              History
+            </button>
           </div>
 
           <div className="grid gap-6 md:grid-cols-2">
@@ -165,7 +215,7 @@ export default function Translate() {
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && e.ctrlKey) {
                       e.preventDefault();
-                      translate();
+                      debouncedTranslate();
                     } else if (e.key === "Escape") {
                       e.preventDefault();
                       setText("");
@@ -453,6 +503,21 @@ export default function Translate() {
           </div>
         </div>
       </div>
+      <HistorySidebar
+        items={history}
+        onSelect={(item) => {
+          setText(item.text);
+          setOutput(item.translation);
+          setLevel(item.level);
+          setIsHistoryOpen(false);
+        }}
+        onClear={() => {
+          setHistory([]);
+          localStorage.removeItem("translationHistory");
+        }}
+        isOpen={isHistoryOpen}
+        toggle={() => setIsHistoryOpen(!isHistoryOpen)}
+      />
     </>
   );
 }

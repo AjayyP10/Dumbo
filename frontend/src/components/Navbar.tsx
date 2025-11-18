@@ -106,32 +106,6 @@ export default function Navbar() {
           </Link>
           <div className="flex items-center md:space-x-4">
             <div className="hidden md:flex items-center space-x-3">
-              <NavLink
-                to="/history"
-                className={({ isActive }) =>
-                  `flex items-center space-x-2 px-3 py-2 rounded-lg font-medium transition-all duration-200 ${
-                    isActive
-                      ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 shadow-md"
-                      : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:shadow-md hover:shadow-gray-200/50 dark:hover:shadow-gray-700/50"
-                  } focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900`
-                }
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={1.5}
-                  stroke="currentColor"
-                  className="w-5 h-5 flex-shrink-0"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 6v6l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <span>{t("history")}</span>
-              </NavLink>
               <button
                 onClick={() => setDark((d) => !d)}
                 className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900 transition-all duration-200 dark:text-yellow-300"
@@ -204,30 +178,6 @@ export default function Navbar() {
                       role="menu"
                       aria-labelledby="user-menu"
                     >
-                      <NavLink
-                        to="/history"
-                        className={({ isActive }) =>
-                          `flex items-center px-4 py-2 text-sm font-medium rounded hover:bg-gray-100 dark:hover:bg-gray-700 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${isActive ? "bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400" : "text-gray-700 dark:text-gray-300"}`
-                        }
-                        onClick={() => setDropdownOpen(false)}
-                        role="menuitem"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          strokeWidth={1.5}
-                          stroke="currentColor"
-                          className="w-5 h-5 mr-3"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M12 6v6l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                          />
-                        </svg>
-                        {t("history")}
-                      </NavLink>
                       <NavLink
                         to="/profile"
                         className={({ isActive }) =>
@@ -392,33 +342,6 @@ export default function Navbar() {
                 </button>
               </div>
               <nav className="space-y-4">
-                <NavLink
-                  to="/history"
-                  className={({ isActive }) =>
-                    `flex items-center space-x-3 p-3 rounded-lg transition-colors ${
-                      isActive
-                        ? "bg-blue-100 dark:bg-blue-900/50 text-blue-600"
-                        : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
-                    } focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2`
-                  }
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth={1.5}
-                    stroke="currentColor"
-                    className="w-5 h-5 flex-shrink-0"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M12 6v6l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  <span>{t("history")}</span>
-                </NavLink>
                 <button
                   onClick={() => {
                     setDark((d) => !d);
