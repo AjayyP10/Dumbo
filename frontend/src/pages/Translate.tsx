@@ -1,11 +1,25 @@
-import { useState, useEffect, useRef, useTransition } from "react";
-// Cache for translation results to avoid duplicate API calls
-const translationCache = new Map<string, string>();
-import type { AxiosError } from "axios";
-import { useTranslation } from "react-i18next";
-import { api } from "../api";
+import { useState, useEffect, useRef } from "react";
+import { useTranslation as useI18n } from "react-i18next";
 import { type HistoryItem } from "../components/HistorySidebar";
 import HistorySidebar from "../components/HistorySidebar";
+import { useTranslation } from "../hooks/useTranslation";
+
+// Simple hook for debouncing values
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
 
 function SpinnerIcon() {
   return (
@@ -33,12 +47,26 @@ function SpinnerIcon() {
 }
 
 export default function Translate() {
-  const { t } = useTranslation();
+  const { t } = useI18n();
   const [text, setText] = useState("");
   const [level, setLevel] = useState("A1");
   const [sourceLang, setSourceLang] = useState("en");
   const [targetLang, setTargetLang] = useState("de");
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Debounce the text input for the query
+  const debouncedText = useDebounce(text, 500);
+
+  // Use the React Query hook
+  const {
+    data,
+    isLoading,
+    error,
+    isFetching
+  } = useTranslation(debouncedText, targetLang, level);
+
+  const output = data?.translation || "";
 
   // Supported languages (code + i18n key)
   const LANGS = [
@@ -63,11 +91,6 @@ export default function Translate() {
     setTargetLang(code);
   };
 
-  const [loading, setLoading] = useState(false);
-  const [output, setOutput] = useState("");
-  const [copied, setCopied] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   const [history, setHistory] = useState<HistoryItem[]>(() => {
     try {
       return JSON.parse(localStorage.getItem("translationHistory") || "[]");
@@ -82,106 +105,39 @@ export default function Translate() {
     localStorage.setItem("translationHistory", JSON.stringify(updated));
   };
 
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const outputTextRef = useRef<HTMLParagraphElement | null>(null);
+  // Save to history when we get a new valid translation
+  useEffect(() => {
+    if (data?.translation && debouncedText) {
+      // Avoid saving if it's already the most recent item
+      if (history.length > 0 && history[0].text === debouncedText && history[0].translation === data.translation) {
+        return;
+      }
 
-  const [isPending, startTransition] = useTransition();
-
-  // Debounce timer reference
-  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
-
-  // Helper to generate cache key
-  const cacheKey = (txt: string) => `${txt}|${sourceLang}|${targetLang}|${level}`;
-
-  const translate = async () => {
-    const trimmed = text.trim();
-    if (!trimmed) return;
-
-    // Check cache first
-    const key = cacheKey(trimmed);
-    if (translationCache.has(key)) {
-      setOutput(translationCache.get(key)!);
-      // focus back to textarea for quick edits
-      setTimeout(() => textareaRef.current?.focus(), 0);
-      return;
-    }
-
-    setError(null);
-    setLoading(true);
-    try {
-      const res = await api.post<{ translation: string }>("translate/", {
-        input_text: trimmed,
-        level,
-        source_lang: sourceLang,
-        target_lang: targetLang,
-      });
-      const translation = res.data.translation;
-      // Store in cache
-      translationCache.set(key, translation);
-      // Use transition for low‑priority UI update
-      startTransition(() => setOutput(translation));
-      // store in history
       saveHistory({
         id: crypto.randomUUID(),
-        text: trimmed,
+        text: debouncedText,
         level,
-        translation,
+        translation: data.translation,
         timestamp: Date.now(),
       });
-      // focus back to textarea for quick edits
-      setTimeout(() => textareaRef.current?.focus(), 0);
-    } catch (err: unknown) {
-      let message = "An unexpected error occurred. Please try again.";
-      if (typeof err === "object" && err) {
-        const axErr = err as AxiosError<{ detail?: string }>;
-        message =
-          axErr.response?.data?.detail ??
-          (axErr as { message?: string }).message ??
-          message;
-      }
-      setError(message);
-    } finally {
-      setLoading(false);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, debouncedText, level]);
 
-  // Debounced wrapper for translate (used on Ctrl+Enter)
-  const debouncedTranslate = () => {
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(() => {
-      translate();
-    }, 300);
-  };
-
-  // Idle‑time pre‑fetch (example: warm up cache for recent history)
-  useEffect(() => {
-    if ("requestIdleCallback" in window) {
-      (window as any).requestIdleCallback(() => {
-        // Pre‑populate cache with recent translations (if any)
-        history.slice(0, 5).forEach((item) => {
-          const key = `${item.text}|${sourceLang}|${targetLang}|${item.level ?? level}`;
-          if (!translationCache.has(key)) {
-            translationCache.set(key, item.translation);
-          }
-        });
-      });
-    }
-  }, []);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const outputTextRef = useRef<HTMLParagraphElement | null>(null);
 
   // Auto-focus textarea on mount
   useEffect(() => {
     textareaRef.current?.focus();
   }, []);
 
-  // Update keydown handler to use debouncedTranslate
-  // (will replace the existing onKeyDown inline code)
-
   return (
     <>
       <div aria-live="polite" className="sr-only" role="status">
-        {loading ? "Translating…" : ""}
+        {isFetching ? "Translating…" : ""}
       </div>
-      {loading && (
+      {isFetching && (
         <div className="fixed top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 z-50 animate-pulse" />
       )}
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-700">
@@ -207,21 +163,14 @@ export default function Translate() {
                 </label>
                 <textarea
                   id="sourceText"
-                  disabled={loading}
-                  aria-busy={loading}
-                  className={`w-full p-4 border-0 rounded-t-2xl min-h-[15rem] max-h-[80vh] resize-none overflow-y-auto transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-gray-100 text-lg ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
+                  className={`w-full p-4 border-0 rounded-t-2xl min-h-[15rem] max-h-[80vh] resize-none overflow-y-auto transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-gray-100 text-lg`}
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && e.ctrlKey) {
-                      e.preventDefault();
-                      debouncedTranslate();
-                    } else if (e.key === "Escape") {
+                    if (e.key === "Escape") {
                       e.preventDefault();
                       setText("");
-                      setOutput("");
                       setCopied(false);
-                      setError(null);
                     }
                   }}
                   placeholder="Enter text to translate..."
@@ -346,21 +295,10 @@ export default function Translate() {
 
                 {/* Action buttons */}
                 <button
-                  onClick={translate}
-                  aria-label="Translate text"
-                  disabled={loading || !text.trim()}
-                  className={`px-6 py-3 rounded-xl font-semibold text-white flex items-center justify-center gap-2 transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl ${loading || !text.trim() ? "bg-gray-400 cursor-not-allowed" : "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"}`}
-                >
-                  {loading && <SpinnerIcon />}
-                  <span>{loading ? t("translating") : t("translate")}</span>
-                </button>
-                <button
                   type="button"
                   onClick={() => {
                     setText("");
-                    setOutput("");
                     setCopied(false);
-                    setError(null);
                     textareaRef.current?.focus();
                   }}
                   aria-label="Clear input and output"
@@ -392,7 +330,7 @@ export default function Translate() {
                         d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
                       />
                     </svg>
-                    {error}
+                    {error instanceof Error ? error.message : "An error occurred"}
                   </p>
                 </div>
               )}
@@ -402,7 +340,7 @@ export default function Translate() {
             <section>
               <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-100 dark:border-gray-700 p-6 flex flex-col min-h-[15rem] max-h-[80vh]">
                 <div className="flex-1 overflow-y-auto whitespace-pre-wrap mb-4">
-                  {loading && !output ? (
+                  {isLoading && !output ? (
                     <div className="space-y-3 animate-pulse" aria-hidden="true">
                       <div className="h-4 bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 rounded-lg w-3/4 animate-shimmer" />
                       <div className="h-4 bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 rounded-lg w-5/6 animate-shimmer" />
@@ -446,7 +384,7 @@ export default function Translate() {
                         Your translated text will appear here
                       </p>
                       <p className="text-sm text-center mt-2">
-                        Press Ctrl+Enter to translate
+                        Type to translate automatically
                       </p>
                     </div>
                   )}
@@ -507,7 +445,6 @@ export default function Translate() {
         items={history}
         onSelect={(item) => {
           setText(item.text);
-          setOutput(item.translation);
           setLevel(item.level);
           setIsHistoryOpen(false);
         }}
@@ -516,7 +453,7 @@ export default function Translate() {
           localStorage.removeItem("translationHistory");
         }}
         isOpen={isHistoryOpen}
-        toggle={() => setIsHistoryOpen(!isHistoryOpen)}
+        toggle={() => setIsHistoryOpen(false)}
       />
     </>
   );
