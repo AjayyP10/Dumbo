@@ -16,7 +16,7 @@ export default defineConfig(({ mode }) => {
           "robots.txt",
           "apple-touch-icon.png",
           "icons/icon-192x192.png",
-          "icons/icon-512x512.png"
+          "icons/icon-512x512.png",
         ],
         manifest: {
           name: "Dumbo Translator",
@@ -31,16 +31,16 @@ export default defineConfig(({ mode }) => {
             {
               src: "/icons/icon-192x192.png",
               sizes: "192x192",
-              type: "image/png"
+              type: "image/png",
             },
             {
               src: "/icons/icon-512x512.png",
               sizes: "512x512",
-              type: "image/png"
-            }
-          ]
-        }
-      })
+              type: "image/png",
+            },
+          ],
+        },
+      }),
     ],
     resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
     server: {
@@ -48,6 +48,20 @@ export default defineConfig(({ mode }) => {
       watch: {
         ignored: ["**/tsconfig.json"],
       },
-    }
+    },
+    build: {
+      // Split vendor libraries into separate chunks for better caching
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            react: ["react", "react-dom"],
+            // Common utility libraries
+            axios: ["axios"],
+            // Tailwind CSS runtime (if any)
+            tailwind: ["tailwindcss"],
+          },
+        },
+      },
+    },
   };
 });
