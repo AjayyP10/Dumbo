@@ -9,6 +9,7 @@ from django.core.cache import cache
 from .cache_utils import _compress, _l1_set, chunk_get, chunk_set
 from .models import Translation
 from .views import (
+    LEVEL_CONFIGS,
     MODEL,
     OPENROUTER_URL,
     SYSTEM_PROMPT,
@@ -52,11 +53,15 @@ def translate_text_task(
 
     async def _translate_chunk(client: httpx.AsyncClient, chunk: str) -> str:
         prompt = _build_prompt(chunk, src_name, tgt_name, level)
+        if tgt_name == "de" and level:
+            config = LEVEL_CONFIGS.get(level, {"temperature": 0.5, "top_p": 0.9})
+        else:
+            config = {"temperature": 0.5, "top_p": 0.9}
         payload = {
             "model": MODEL,
             "max_tokens": int(len(chunk.split()) * 2),
-            "temperature": 0,
-            "top_p": 0.1,
+            "temperature": config["temperature"],
+            "top_p": config["top_p"],
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": prompt},

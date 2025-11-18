@@ -1,26 +1,19 @@
+import csv
 import os
 import time
 
 import httpx
-import csv
 from celery.result import AsyncResult
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.http import HttpResponse, HttpResponseRedirect
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
-from rest_framework.views import APIView
-from django.core.cache import cache
 from rest_framework import generics, permissions
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
-
-from .models import Translation, UserLoginLog
-from .serializers import (
-    RegisterSerializer,
-    TranslationSerializer,
-    UserLoginLogSerializer,
-)
 
 # Import shared caching helpers
 from .cache_utils import (
@@ -32,9 +25,15 @@ from .cache_utils import (
     chunk_set,
     make_cache_key,
 )
-
+from .models import Translation, UserLoginLog
+from .serializers import (
+    RegisterSerializer,
+    TranslationSerializer,
+    UserLoginLogSerializer,
+)
 
 # Custom auth class to allow CSRF-exempt session-based requests (e.g., /api/logout/)
+
 
 class CsrfExemptSessionAuthentication(SessionAuthentication):
     def enforce_csrf(self, request):
@@ -46,19 +45,45 @@ MODEL = "google/gemma-3-27b-it:free"
 
 # --- Prompt helpers (leaner prompts & optional chunking) --------------------
 SYSTEM_PROMPT = (
-    "You are a professional translator. Reply ONLY with the translated text."
+    "You are a professional translator. Reply ONLY with the translated text. "
+    "Follow exact style in user prompt (simple/basic vs fluent/natural). "
+    "Do not add explanations, titles, or extra text."
 )
 
 MAX_CHARS_PER_REQUEST = 1500  # safety margin vs LLM context length
 
 
+LEVEL_CONFIGS = {
+    "A1": {
+        "temperature": 0.2,
+        "top_p": 0.7,
+        "style": "very simple German (A1): basic words, short sentences.",
+    },
+    "A2": {
+        "temperature": 0.4,
+        "top_p": 0.8,
+        "style": "simple German (A2): basic grammar/common words, everyday phrases.",
+    },
+    "B1": {
+        "temperature": 0.6,
+        "top_p": 0.9,
+        "style": "everyday German (B1): natural conversations/work/travel.",
+    },
+    "B2": {
+        "temperature": 0.8,
+        "top_p": 0.95,
+        "style": "advanced fluent German (B2): native-like, idiomatic.",
+    },
+}
+
+
 def _build_prompt(text: str, src: str, tgt: str, level: str = "") -> str:
     """Return a concise translation prompt for the LLM."""
     if tgt == "de" and level:
-        return (
-            f"Translate the following text from {src} to German ({level}).\\n\\n" + text
-        )
-    return f"Translate from {src} to {tgt}:\\n\\n" + text
+        config = LEVEL_CONFIGS.get(level, {})
+        style = config.get("style", f"({level})")
+        return f"Translate from {src} to German using {style}:\n\n{text}"
+    return f"Translate from {src} to {tgt}:\n\n" + text
 
 
 def _split_into_chunks(text: str, max_chars: int = MAX_CHARS_PER_REQUEST):
@@ -206,11 +231,18 @@ class TranslateView(APIView):
                     translations_accum.append(cached_chunk)
                     continue
                 prompt = _build_prompt(chunk, src_lang_name, tgt_lang_name, level)
+                if tgt_lang_name == "de" and level:
+                    config = LEVEL_CONFIGS.get(level) or {
+                        "temperature": 0.5,
+                        "top_p": 0.9,
+                    }
+                else:
+                    config = {"temperature": 0.5, "top_p": 0.9}
                 payload = {
                     "model": MODEL,
                     "max_tokens": max(60, int(len(chunk.split()) * 4)),
-                    "temperature": 0,
-                    "top_p": 0.1,
+                    "temperature": config["temperature"],
+                    "top_p": config["top_p"],
                     "messages": [
                         {"role": "system", "content": SYSTEM_PROMPT},
                         {"role": "user", "content": prompt},
