@@ -14,7 +14,7 @@ import Translate from "./pages/Translate";
 import History from "./pages/History";
 import LoginLogs from "./pages/LoginLogs";
 import { PrivateRoute, PublicOnly } from "./RouteGuards";
-import reportWebVitals from './reportWebVitals';
+import reportWebVitals from "./reportWebVitals";
 
 // Register PWA service worker (only in production)
 if (import.meta.env.PROD) {

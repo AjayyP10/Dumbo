@@ -21,31 +21,6 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
-function SpinnerIcon() {
-  return (
-    <svg
-      className="animate-spin h-5 w-5 text-white"
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-    >
-      <circle
-        className="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="4"
-      />
-      <path
-        className="opacity-75"
-        fill="currentColor"
-        d="M4 12a8 8 0 018-8v4l3-3-3-3v4a12 12 0 00-12 12h4z"
-      />
-    </svg>
-  );
-}
-
 export default function Translate() {
   const { t } = useI18n();
   const [text, setText] = useState("");
@@ -59,12 +34,11 @@ export default function Translate() {
   const debouncedText = useDebounce(text, 500);
 
   // Use the React Query hook
-  const {
-    data,
-    isLoading,
-    error,
-    isFetching
-  } = useTranslation(debouncedText, targetLang, level);
+  const { data, isLoading, error, isFetching } = useTranslation(
+    debouncedText,
+    targetLang,
+    level,
+  );
 
   const output = data?.translation || "";
 
@@ -109,7 +83,11 @@ export default function Translate() {
   useEffect(() => {
     if (data?.translation && debouncedText) {
       // Avoid saving if it's already the most recent item
-      if (history.length > 0 && history[0].text === debouncedText && history[0].translation === data.translation) {
+      if (
+        history.length > 0 &&
+        history[0].text === debouncedText &&
+        history[0].translation === data.translation
+      ) {
         return;
       }
 
@@ -330,7 +308,9 @@ export default function Translate() {
                         d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
                       />
                     </svg>
-                    {error instanceof Error ? error.message : "An error occurred"}
+                    {error instanceof Error
+                      ? error.message
+                      : "An error occurred"}
                   </p>
                 </div>
               )}
