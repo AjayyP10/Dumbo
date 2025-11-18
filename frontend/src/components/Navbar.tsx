@@ -97,24 +97,15 @@ export default function Navbar() {
             className="font-bold text-xl dark:text-gray-100 flex items-center space-x-2 hover:opacity-80 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900 transition-all duration-200"
             aria-label="Dumbo Translator home"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-              stroke="currentColor"
+            <img
+              src="/icons/dumbo_logo.svg"
+              alt="Dumbo logo"
               className="w-7 h-7 flex-shrink-0"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 0 1 9-9"
-              />
-            </svg>
+            />
             Dumbo
           </Link>
           <div className="flex items-center md:space-x-4">
-            <div className="hidden md:flex items-center space-x-4">
+            <div className="hidden md:flex items-center space-x-3">
               <NavLink
                 to="/history"
                 className={({ isActive }) =>
@@ -124,7 +115,6 @@ export default function Navbar() {
                       : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:shadow-md hover:shadow-gray-200/50 dark:hover:shadow-gray-700/50"
                   } focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900`
                 }
-                prefetch="intent"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -137,7 +127,7 @@ export default function Navbar() {
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    d="M12 10.5v6m3-3H9m4.06-7.19l-2.12-2.12M4.93 4.93l2.12 2.12M20.24 20.24l-2.12-2.12M16.65 3.75l2.12 2.12M3.75 16.65l2.12-2.12"
+                    d="M12 6v6l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                   />
                 </svg>
                 <span>{t("history")}</span>
@@ -148,7 +138,37 @@ export default function Navbar() {
                 title="Toggle dark mode"
                 aria-label="Toggle dark mode"
               >
-                {dark ? "🌞" : "🌙"}
+                {dark ? (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.5}
+                    stroke="currentColor"
+                    className="w-5 h-5"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 3v1.5m0 15V21m8.364-8.364h-1.5M4.136 12.636H2.636m15.728 6.364l-1.06-1.06M6.696 6.696L5.636 5.636m12.728 12.728l-1.06 1.06M6.696 17.304l-1.06 1.06M16.5 12a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.5}
+                    stroke="currentColor"
+                    className="w-5 h-5"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z"
+                    />
+                  </svg>
+                )}
               </button>
               {isLoggedIn() && (
                 <div ref={dropdownRef} className="relative">
@@ -174,7 +194,7 @@ export default function Navbar() {
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        d="m19.5 8.25-.75.75M6 15 3.75 16.5m0 0 3 3L12.75 15.5m-9 0L12.75 8.5 15.75 12"
+                        d="M19 9l-7 7-7-7"
                       />
                     </svg>
                   </button>
@@ -189,7 +209,6 @@ export default function Navbar() {
                         className={({ isActive }) =>
                           `flex items-center px-4 py-2 text-sm font-medium rounded hover:bg-gray-100 dark:hover:bg-gray-700 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${isActive ? "bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400" : "text-gray-700 dark:text-gray-300"}`
                         }
-                        prefetch="intent"
                         onClick={() => setDropdownOpen(false)}
                         role="menuitem"
                       >
@@ -204,7 +223,7 @@ export default function Navbar() {
                           <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
-                            d="M12 10.5v6m3-3H9m4.06-7.19l-2.12-2.12M4.93 4.93l2.12 2.12M20.24 20.24l-2.12-2.12M16.65 3.75l2.12 2.12M3.75 16.65l2.12-2.12"
+                            d="M12 6v6l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                           />
                         </svg>
                         {t("history")}
@@ -214,7 +233,6 @@ export default function Navbar() {
                         className={({ isActive }) =>
                           `flex items-center px-4 py-2 text-sm font-medium rounded hover:bg-gray-100 dark:hover:bg-gray-700 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${isActive ? "bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400" : "text-gray-700 dark:text-gray-300"}`
                         }
-                        prefetch="intent"
                         onClick={() => setDropdownOpen(false)}
                         role="menuitem"
                       >
@@ -396,7 +414,7 @@ export default function Navbar() {
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      d="M12 10.5v6m3-3H9m4.06-7.19l-2.12-2.12M4.93 4.93l2.12 2.12M20.24 20.24l-2.12-2.12M16.65 3.75l2.12 2.12M3.75 16.65l2.12-2.12"
+                      d="M12 6v6l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
                   <span>{t("history")}</span>

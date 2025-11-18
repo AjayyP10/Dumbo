@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <!-- Elephant head -->
+  <ellipse cx="50" cy="45" rx="28" ry="32" fill="#4F46E5" opacity="0.9"/>
+  
+  <!-- Ears -->
+  <ellipse cx="28" cy="38" rx="12" ry="18" fill="#6366F1" opacity="0.8"/>
+  <ellipse cx="72" cy="38" rx="12" ry="18" fill="#6366F1" opacity="0.8"/>
+  
+  <!-- Trunk -->
+  <path d="M 50 60 Q 48 70, 45 75 Q 42 80, 40 82" stroke="#4F46E5" stroke-width="6" fill="none" stroke-linecap="round"/>
+  
+  <!-- Eyes -->
+  <circle cx="42" cy="42" r="3" fill="#1F2937"/>
+  <circle cx="58" cy="42" r="3" fill="#1F2937"/>
+  
+  <!-- Speech bubble -->
+  <rect x="60" y="15" width="32" height="22" rx="4" fill="#60A5FA" opacity="0.9"/>
+  <polygon points="60,30 55,35 60,37" fill="#60A5FA" opacity="0.9"/>
+  
+  <!-- Translation symbols in bubble -->
+  <text x="76" y="23" font-size="8" fill="white" font-weight="bold" text-anchor="middle">A</text>
+  <text x="76" y="32" font-size="8" fill="white" font-weight="bold" text-anchor="middle">文</text>
+</svg>
