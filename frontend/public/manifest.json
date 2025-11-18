@@ -1,7 +1,7 @@
 {
   "name": "Dumbo Translator",
   "short_name": "Dumbo",
-  "description": "Offline-first PWA for accurate CEFR-level German translations",
+  "description": "Offline-first PWA for accurate CEFR-level German, Spanish & French translations",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
