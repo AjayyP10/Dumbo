@@ -288,10 +288,11 @@ export default function Translate() {
                   type="button"
                   onClick={handleTranslate}
                   disabled={!text || isFetching}
-                  className={`flex-1 px-6 py-3 rounded-xl font-bold text-white shadow-lg transition-all duration-300 transform hover:scale-105 active:scale-95 ${!text || isFetching
-                    ? "bg-gray-400 cursor-not-allowed"
-                    : "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
-                    }`}
+                  className={`flex-1 px-6 py-3 rounded-xl font-bold text-white shadow-lg transition-all duration-300 transform hover:scale-105 active:scale-95 ${
+                    !text || isFetching
+                      ? "bg-gray-400 cursor-not-allowed"
+                      : "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+                  }`}
                 >
                   {isFetching ? "Translating..." : "Translate"}
                 </button>
