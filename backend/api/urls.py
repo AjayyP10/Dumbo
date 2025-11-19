@@ -8,6 +8,7 @@ from .views import (
     DeleteAccountView,
     ExportHistoryView,
     GoogleAuthComplete,
+    HealthCheckView,
     HistoryListView,
     LoginLogListView,
     LogoutView,
@@ -19,6 +20,7 @@ from .views import (
 )
 
 urlpatterns = [
+    path("health/", HealthCheckView.as_view(), name="health"),
     path("oauth/", include("social_django.urls", namespace="social")),
     # After social-auth processes the callback it will redirect here to issue JWT tokens
     path(

@@ -1,25 +1,14 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
-# Exit immediately if a command exits with a non-zero status.
-set -o errexit
+# Anchor to project root regardless of where script is called from
+cd "$(dirname "$0")"
 
 # -----------------------------
 # Backend (Django) dependencies
 # -----------------------------
-# Upgrade pip to latest and install Python requirements
 pip install --upgrade pip setuptools wheel
 pip install -r backend/requirements.txt
-# Explicitly ensure SimpleJWT is installed (redundant if already in requirements but helps CI clarity)
-pip install "djangorestframework-simplejwt>=5.3"
-
-# -----------------------------
-# Frontend (React + Vite) build
-# -----------------------------
-# Install Node dependencies and build the production bundle
-cd frontend
-npm install
-npm run build
-cd ..
 
 # -----------------------------
 # Django housekeeping

@@ -9,13 +9,32 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ENV
 load_dotenv(BASE_DIR / ".env")  # optional local .env
-SECRET_KEY = os.getenv("SECRET_KEY", "unsafe-secret-for-dev")
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "SECRET_KEY is not set. Add it to your .env or Render environment variables."
+    )
 # Default to production-safe DEBUG=False unless explicitly overridden
 DEBUG = os.getenv("DEBUG", "False") == "True"
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", os.getenv("RENDER_EXTERNAL_HOSTNAME", "")]
-CSRF_TRUSTED_ORIGINS = [f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME', '')}"]
-CORS_ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "").split(",")
+ALLOWED_HOSTS = [
+    h
+    for h in [
+        "localhost",
+        "127.0.0.1",
+        os.getenv("RENDER_EXTERNAL_HOSTNAME", ""),
+    ]
+    if h
+]
+CSRF_TRUSTED_ORIGINS = []
+_render_hostname = os.getenv("RENDER_EXTERNAL_HOSTNAME", "").strip()
+if _render_hostname:
+    CSRF_TRUSTED_ORIGINS.append(f"https://{_render_hostname}")
+CORS_ALLOWED_ORIGINS = [
+    o for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()
+]
 
 INSTALLED_APPS = [
     "social_django",
@@ -26,6 +45,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "django_celery_results",  # store Celery task results in DB (optional)
     "backend.api",  # updated to fully qualified path
@@ -119,6 +139,13 @@ REST_FRAMEWORK = {
 # Social Auth (Google)
 SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = os.getenv("GOOGLE_CLIENT_ID")
 SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+if not SOCIAL_AUTH_GOOGLE_OAUTH2_KEY or not SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET:
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set "
+        "in .env or Render environment."
+    )
 SOCIAL_AUTH_LOGIN_REDIRECT_URL = "/api/oauth/google/jwt/"
 # After social-auth completes OAuth handshake, redirect here to issue JWT tokens
 SOCIAL_AUTH_LOGIN_ERROR_URL = "/api/oauth/error/"
@@ -146,7 +173,7 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=30),
     "ROTATE_REFRESH_TOKENS": True,
-    "BLACKLIST_AFTER_ROTATION": False,
+    "BLACKLIST_AFTER_ROTATION": True,
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
@@ -201,3 +228,9 @@ SESSION_COOKIE_SAMESITE = "None" if not DEBUG else "Lax"
 CSRF_COOKIE_SECURE = not DEBUG
 # Align SameSite policy for CSRF cookie to avoid mismatch warnings
 CSRF_COOKIE_SAMESITE = "None" if not DEBUG else "Lax"
+
+# HSTS – enforce HTTPS for 1 year, include subdomains, allow preloading
+if not DEBUG:
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True

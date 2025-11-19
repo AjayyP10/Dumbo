@@ -1,24 +1,21 @@
 Django>=5.0
 djangorestframework>=3.14
-djangorestframework-simplejwt>=5.3
+djangorestframework-simplejwt[blacklist]>=5.3
 django-cors-headers>=4.3
 python-dotenv>=1.0
 dj-database-url>=2.1
 psycopg2-binary>=2.9
 whitenoise>=6.6
 requests>=2.31
-httpx[http2]>=0.25  # async HTTP client
-# Caching
+httpx[http2,socks]>=0.27
 django-redis>=5.4
 gunicorn>=21.2
-# Testing
-pytest>=7.4
-pytest-django>=4.7
-httpx[socks]>=0.25
-django-redis>=5.4
-httpx>=0.25
 celery[redis]>=5.3
 django-celery-results>=2.5
 social-auth-app-django>=5.4
+# Dev / linting
+pytest>=7.4
+pytest-django>=4.7
 flake8>=7.0
 isort>=5.13
+black>=23.0

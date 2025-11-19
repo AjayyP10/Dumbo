@@ -1,12 +1,13 @@
 services:
+  # ── Django / Gunicorn (HTTP serving) ─────────────────────────────
   - type: web
     name: dumbo-backend
     env: python
     region: frankfurt
     plan: free
-    buildCommand: |
-      bash build.sh
-    startCommand: sh -c "celery -A backend.dumbo worker --loglevel=INFO & python -m gunicorn backend.dumbo.wsgi:application --bind 0.0.0.0:$PORT"
+    buildCommand: bash build.sh
+    startCommand: python -m gunicorn backend.dumbo.wsgi:application --bind 0.0.0.0:$PORT
+    healthCheckPath: /api/health/
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -26,21 +27,62 @@ services:
         sync: false
       - key: OPENROUTER_API_KEY
         sync: false
+      - key: TRANSLATION_MODEL
+        value: nvidia/nemotron-3-super-120b-a12b:free
       - key: ALLOWED_ORIGINS
         value: https://dumbo-frontend.onrender.com
+      - key: RENDER_EXTERNAL_HOSTNAME
+        value: dumbo-2.onrender.com
+      - key: FRONTEND_URL
+        value: https://dumbo-frontend.onrender.com
 
+  # ── Celery worker (background translation jobs) ──────────────────
+  - type: web
+    name: dumbo-celery
+    env: python
+    region: frankfurt
+    plan: free
+    buildCommand: bash build.sh
+    startCommand: celery -A backend.dumbo worker --loglevel=info --pool=solo
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: dumbo-db
+          property: connectionString
+      - key: CACHE_URL
+        fromService:
+          name: dumbo-redis
+          type: redis
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          name: dumbo-redis
+          type: redis
+          property: connectionString
+      - key: SECRET_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      # Worker does not need to serve HTTP; Gunicorn is not started here.
 
+  # ── Redis (cache + Celery broker) ────────────────────────────────
+  # NOTE: ipAllowList 0.0.0.0/0 is required on Render's free Redis tier
+  # because it does not support service-restricted networking.
+  # Upgrade to Upstash Redis (free tier, 10K cmds/day) for auth + IP
+  # restriction when moving off the free tier.
   - type: redis
     name: dumbo-redis
     plan: free
     region: frankfurt
     ipAllowList:
       - source: 0.0.0.0/0
-        description: everywhere
+        description: unrestricted (free-tier limitation – see note above)
 
+  # ── Static frontend SPA ──────────────────────────────────────────
   - type: web
     name: dumbo-frontend
     runtime: static
+    region: frankfurt
     buildCommand: |
       npm install --prefix frontend
       npm run --prefix frontend build
@@ -49,8 +91,7 @@ services:
       - key: VITE_API_URL
         value: https://dumbo-2.onrender.com
 
-
 databases:
   - name: dumbo-db
     plan: free
-    region: Frankfurt
+    region: frankfurt

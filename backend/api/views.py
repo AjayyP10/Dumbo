@@ -1,6 +1,5 @@
 import csv
 import os
-import time
 
 import httpx
 from celery.result import AsyncResult
@@ -15,7 +14,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-# Import shared caching helpers
+# Import shared translation engine (no circular imports)
 from .cache_utils import (
     _compress,
     _decompress,
@@ -31,6 +30,10 @@ from .serializers import (
     TranslationSerializer,
     UserLoginLogSerializer,
 )
+from .translation_engine import (
+    _split_into_chunks,
+    translate_chunk_sync,
+)
 
 # Custom auth class to allow CSRF-exempt session-based requests (e.g., /api/logout/)
 
@@ -38,70 +41,6 @@ from .serializers import (
 class CsrfExemptSessionAuthentication(SessionAuthentication):
     def enforce_csrf(self, request):
         return  # Skip CSRF; view stays @csrf_exempt
-
-
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL = "google/gemma-3-27b-it:free"
-
-# --- Prompt helpers (leaner prompts & optional chunking) --------------------
-SYSTEM_PROMPT = (
-    "You are a professional translator. Reply ONLY with the translated text. "
-    "Follow exact style in user prompt (simple/basic vs fluent/natural). "
-    "Do not add explanations, titles, or extra text."
-)
-
-MAX_CHARS_PER_REQUEST = 1500  # safety margin vs LLM context length
-
-
-LEVEL_CONFIGS = {
-    "A1": {
-        "temperature": 0.2,
-        "top_p": 0.7,
-        "style": "very simple German (A1): basic words, short sentences.",
-    },
-    "A2": {
-        "temperature": 0.4,
-        "top_p": 0.8,
-        "style": "simple German (A2): basic grammar/common words, everyday phrases.",
-    },
-    "B1": {
-        "temperature": 0.6,
-        "top_p": 0.9,
-        "style": "everyday German (B1): natural conversations/work/travel.",
-    },
-    "B2": {
-        "temperature": 0.8,
-        "top_p": 0.95,
-        "style": "advanced fluent German (B2): native-like, idiomatic.",
-    },
-}
-
-
-def _build_prompt(text: str, src: str, tgt: str, level: str = "") -> str:
-    """Return a concise translation prompt for the LLM."""
-    if tgt == "de" and level:
-        config = LEVEL_CONFIGS.get(level, {})
-        style = config.get("style", f"({level})")
-        return f"Translate from {src} to German using {style}:\n\n{text}"
-    return f"Translate from {src} to {tgt}:\n\n" + text
-
-
-def _split_into_chunks(text: str, max_chars: int = MAX_CHARS_PER_REQUEST):
-    """Split long input on sentence boundaries to keep each chunk within max_chars."""
-    import re
-
-    sentences = re.split(r"(?<=[.!?])\\s+", text)
-    chunks, current = [], ""
-    for s in sentences:
-        # +1 for space/newline between sentences
-        if len(current) + len(s) + 1 > max_chars:
-            if current:
-                chunks.append(current.strip())
-                current = ""
-        current += s + " "
-    if current.strip():
-        chunks.append(current.strip())
-    return chunks
 
 
 class TranslateView(APIView):
@@ -209,11 +148,6 @@ class TranslateView(APIView):
             )
             return Response({"translation": existing.output_text}, status=200)
 
-        headers = {
-            "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
-            "Content-Type": "application/json",
-        }
-
         # ---------------- Translation loop over chunks ----------------
         src_lang_name = dict(Translation.LANG_CHOICES).get(source_lang)
         tgt_lang_name = dict(Translation.LANG_CHOICES).get(target_lang)
@@ -230,82 +164,15 @@ class TranslateView(APIView):
                 if cached_chunk:
                     translations_accum.append(cached_chunk)
                     continue
-                prompt = _build_prompt(chunk, src_lang_name, tgt_lang_name, level)
-                if tgt_lang_name == "de" and level:
-                    config = LEVEL_CONFIGS.get(level) or {
-                        "temperature": 0.5,
-                        "top_p": 0.9,
-                    }
-                else:
-                    config = {"temperature": 0.5, "top_p": 0.9}
-                payload = {
-                    "model": MODEL,
-                    "max_tokens": max(60, int(len(chunk.split()) * 4)),
-                    "temperature": config["temperature"],
-                    "top_p": config["top_p"],
-                    "messages": [
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user", "content": prompt},
-                    ],
-                }
+                try:
+                    from .translation_engine import _build_prompt
 
-                retries = 0
-                backoff = 2
-                while True:
-                    try:
-                        llm_resp = client.post(
-                            OPENROUTER_URL, json=payload, headers=headers
-                        )
-                        if llm_resp.status_code == 429 and retries < 3:
-                            retries += 1
-                            ra = llm_resp.headers.get("Retry-After")
-                            try:
-                                wait = int(ra) if ra else backoff
-                            except Exception:
-                                wait = backoff
-                            time.sleep(wait)
-                            backoff = min(backoff * 2, 30)
-                            continue
-                        llm_resp.raise_for_status()
-                        break
-                    except httpx.HTTPStatusError as e:
-                        if e.response.status_code == 429 and retries < 3:
-                            retries += 1
-                            ra = e.response.headers.get("Retry-After")
-                            try:
-                                wait = int(ra) if ra else backoff
-                            except Exception:
-                                wait = backoff
-                            time.sleep(wait)
-                            backoff = min(backoff * 2, 30)
-                            continue
-                        if e.response.status_code == 429:
-                            return Response(
-                                {
-                                    "error": (
-                                        "Upstream rate limit still exceeded. "
-                                        "Please try later."
-                                    )
-                                },
-                                status=429,
-                            )
-                        return Response(
-                            {"error": str(e)}, status=e.response.status_code
-                        )
-                    except httpx.RequestError:
-                        return Response(
-                            {
-                                "error": (
-                                    "Upstream translation service unavailable. "
-                                    "Please try later."
-                                )
-                            },
-                            status=503,
-                        )
-
-                translated_chunk = llm_resp.json()["choices"][0]["message"][
-                    "content"
-                ].strip()
+                    prompt = _build_prompt(chunk, src_lang_name, tgt_lang_name, level)
+                    translated_chunk = translate_chunk_sync(
+                        client, prompt, level, tgt_lang_name
+                    )
+                except RuntimeError as e:
+                    return Response({"error": str(e)}, status=503)
                 chunk_set(chunk, source_lang, target_lang, level, translated_chunk)
                 translations_accum.append(translated_chunk)
 
@@ -567,3 +434,35 @@ class TaskStatusView(APIView):
         elif res.state == "FAILURE":
             data["error"] = str(res.result)
         return Response(data)
+
+
+class HealthCheckView(APIView):
+    """Health check endpoint for Render / load balancers.
+
+    Returns 200 when the app is alive.  Extend with DB / cache probes
+    if you want a deeper readiness check.
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        health = {"status": "ok"}
+        # Quick DB probe
+        try:
+            from django.db import connection
+
+            connection.ensure_connection()
+            health["database"] = "ok"
+        except Exception as exc:
+            health["database"] = f"error: {exc}"
+        # Quick cache probe
+        try:
+            from django.core.cache import cache
+
+            cache.set("__health__", 1, 5)
+            health["cache"] = "ok" if cache.get("__health__") == 1 else "degraded"
+        except Exception as exc:
+            health["cache"] = f"error: {exc}"
+
+        status_code = 200 if health.get("database") == "ok" else 503
+        return Response(health, status=status_code)
