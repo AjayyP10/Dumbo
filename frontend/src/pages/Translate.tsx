@@ -433,6 +433,7 @@ export default function Translate() {
         items={history}
         onSelect={(item) => {
           setText(item.text);
+          setQueryText(item.text);
           setLevel(item.level);
           setIsHistoryOpen(false);
         }}
