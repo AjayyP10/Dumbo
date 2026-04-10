@@ -16,3 +16,6 @@ static/
 # Misc
 .DS_Store
 .env.*
+
+# Qwen Code (local tool settings)
+.qwen/
