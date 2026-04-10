@@ -47,6 +47,58 @@ LEVEL_CONFIGS = {
     },
 }
 
+# Common German words used to identify German text in mixed outputs
+GERMAN_MARKERS = [
+    "gehen",
+    "zum",
+    "und",
+    "ich",
+    "das",
+    "der",
+    "die",
+    "ist",
+    "haben",
+    "werden",
+    "konnen",
+    "mussen",
+    "sollen",
+    "wollen",
+    "mogen",
+    "durfen",
+    "nicht",
+    "auch",
+    "noch",
+    "aber",
+    "denn",
+    "weil",
+    "dass",
+    "wenn",
+    "hallo",
+    "guten",
+    "bitte",
+    "danke",
+    "ja",
+    "nein",
+    "deutsch",
+    "klasse",
+    "kurs",
+    "unterricht",
+    "lass",
+    "uns",
+]
+
+
+def _is_german(text_snippet: str) -> bool:
+    """Check if text looks like German translation."""
+    if not text_snippet or len(text_snippet) < 3:
+        return False
+    lower = text_snippet.lower()
+    # Has German-specific characters
+    if any(c in text_snippet for c in "äöüß"):
+        return True
+    # Contains German words
+    return any(marker in lower for marker in GERMAN_MARKERS)
+
 
 def _build_prompt(text: str, src: str, tgt: str, level: str = "") -> str:
     """Return a concise translation prompt for the LLM."""
@@ -105,6 +157,84 @@ def _build_payload(chunk: str, level: str, tgt_lang: str) -> dict:
     }
 
 
+def _strip_reasoning(text: str) -> str:
+    """Remove chain-of-thought / reasoning blocks from LLM output.
+
+    Aggressively extracts only the actual translation text.
+    """
+    if not text:
+        return text
+
+    try:
+        # Strategy 1: Find all double-quoted text, pick the German one
+        all_quotes = re.findall(r'"([^"\n]{5,})"', text)
+        german_quotes = [q for q in all_quotes if _is_german(q)]
+
+        if german_quotes:
+            # Return the longest German quote (usually the main translation)
+            return max(german_quotes, key=len).strip()
+
+        # Strategy 2: Look for "Provide translation:" or similar indicators
+        for indicator in [
+            "provide translation:",
+            "translation:",
+            "german:",
+            "deutsch:",
+        ]:
+            idx = text.lower().find(indicator)
+            if idx != -1:
+                after = text[idx + len(indicator) :].strip()
+                quotes_after = re.findall(r'"([^"\n]{5,})"', after)
+                for q in quotes_after:
+                    if _is_german(q):
+                        return q.strip()
+                # If no quotes, take first sentence
+                first_sent = re.split(r"[.!?\n]", after)[0].strip()
+                if first_sent and len(first_sent) > 5:
+                    return first_sent
+
+        # Strategy 3: If text starts with reasoning, find German text anywhere
+        reasoning_starters = [
+            "we need to",
+            "the user",
+            "they want",
+            "let me",
+            "i need to",
+            "first,",
+            "to translate",
+            "the source text",
+            "the sentence",
+            "the text",
+            "the phrase",
+        ]
+        if any(text.lower().startswith(s) for s in reasoning_starters):
+            if german_quotes:
+                return german_quotes[0].strip()
+            # Find any substantial German text
+            sentences = re.split(r"[.!?\n]+", text)
+            for sent in reversed(sentences):
+                sent = sent.strip().strip("\"' ")
+                if len(sent) > 10 and _is_german(sent):
+                    return sent
+
+        # Strategy 4: Fallback - if text is short, return as-is
+        if len(text) < 150:
+            return text.strip()
+
+        # Strategy 5: Take the last sentence that looks like German
+        sentences = [
+            s.strip().strip("\"' ") for s in re.split(r"[.!?\n]+", text) if s.strip()
+        ]
+        for sent in reversed(sentences):
+            if len(sent) > 5 and _is_german(sent):
+                return sent
+
+        return text.strip()
+    except Exception:
+        # Never crash - fallback to original text
+        return text.strip() if text else text
+
+
 def translate_chunk_sync(
     client: httpx.Client, chunk: str, level: str, tgt_lang: str
 ) -> str:
@@ -132,9 +262,6 @@ def translate_chunk_sync(
             llm_resp.raise_for_status()
             data = llm_resp.json()
             raw = data["choices"][0]["message"]["content"].strip()
-            # Strip chain-of-thought / reasoning blocks if present
-            # Some models output <thinking>...</thinking> or "Reasoning:" blocks
-            # Keep only the final translated text
             cleaned = _strip_reasoning(raw)
             return cleaned
         except httpx.HTTPStatusError as e:
@@ -159,127 +286,3 @@ def translate_chunk_sync(
             raise RuntimeError(
                 "Upstream translation service unavailable. Please try later."
             )
-
-
-def _strip_reasoning(text: str) -> str:
-    """Remove chain-of-thought / reasoning blocks from LLM output.
-
-    Aggressively extracts only the actual translation text.
-    Handles patterns like:
-    - "We need to translate... Provide translation: "German text" Or "Alt German""
-    - Reasoning paragraphs followed by the actual translation
-    """
-    if not text:
-        return text
-
-    # Strategy 1: Find all quoted German text and pick the best one
-    # Matches text in quotes that contains German words/patterns
-    all_quotes = re.findall(r'[""]([^""\n]{5,})[""]', text)
-
-    german_markers = [
-        "gehen",
-        "zum",
-        "und",
-        "ich",
-        "das",
-        "der",
-        "die",
-        "ist",
-        "haben",
-        "werden",
-        "können",
-        "müssen",
-        "sollen",
-        "wollen",
-        "mögen",
-        "dürfen",
-        "nicht",
-        "auch",
-        "noch",
-        "aber",
-        "denn",
-        "weil",
-        "dass",
-        "wenn",
-        "Hallo",
-        "Guten",
-        "Bitte",
-        "Danke",
-        "Ja",
-        "Nein",
-        "Deutsch",
-        "klasse",
-        "kurs",
-        "unterricht",
-        "lass",
-        "uns",
-    ]
-
-    def is_german(text_snippet: str) -> bool:
-        lower = text_snippet.lower()
-        # Has German-specific characters
-        if any(c in text_snippet for c in "äöüß"):
-            return True
-        # Contains German words
-        return any(marker in lower for marker in german_markers)
-
-    # Filter quotes to only those that look like German translations
-    german_quotes = [q for q in all_quotes if is_german(q)]
-
-    if german_quotes:
-        # Return the longest German-looking quote (usually the main translation)
-        best = max(german_quotes, key=len)
-        return best.strip()
-
-    # Strategy 2: Look for "Provide translation:" or similar indicators
-    for indicator in ["provide translation:", "translation:", "german:", "deutsch:"]:
-        idx = text.lower().find(indicator)
-        if idx != -1:
-            after = text[idx + len(indicator) :].strip()
-            # Get first quoted text after indicator
-            quotes_after = re.findall(r'[""]([^""\n]{5,})[""]', after)
-            for q in quotes_after:
-                if is_german(q):
-                    return q.strip()
-            # If no quotes, take first sentence
-            first_sent = re.split(r"[.!?\n]", after)[0].strip()
-            if first_sent and len(first_sent) > 5:
-                return first_sent
-
-    # Strategy 3: If text starts with reasoning, extract quoted German text anywhere
-    reasoning_starters = [
-        "we need to",
-        "the user",
-        "they want",
-        "let me",
-        "i need to",
-        "first,",
-        "to translate",
-        "the source text",
-        "the sentence",
-        "the text",
-        "the phrase",
-    ]
-    if any(text.lower().startswith(s) for s in reasoning_starters):
-        if german_quotes:
-            return german_quotes[0].strip()
-        # Try to find any substantial German text (not just in quotes)
-        sentences = re.split(r"[.!?\n]+", text)
-        for sent in reversed(sentences):
-            sent = sent.strip().strip("\"' ")
-            if len(sent) > 10 and is_german(sent):
-                return sent
-
-    # Strategy 4: Fallback - if text is reasonably short, return as-is
-    if len(text) < 150:
-        return text.strip()
-
-    # Strategy 5: Take the last sentence that looks like German
-    sentences = [
-        s.strip().strip("\"' ") for s in re.split(r"[.!?\n]+", text) if s.strip()
-    ]
-    for sent in reversed(sentences):
-        if len(sent) > 5 and is_german(sent):
-            return sent
-
-    return text.strip()
