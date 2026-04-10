@@ -17,8 +17,6 @@ MODEL = os.getenv("TRANSLATION_MODEL", "nvidia/nemotron-3-super-120b-a12b:free")
 SYSTEM_PROMPT = (
     "You are a professional translator. Output ONLY the translated text. "
     "Never explain, analyze, think out loud, or provide alternatives. "
-    "Never say 'We need to translate' or similar phrases. "
-    "Never use quotes around the translation. "
     "Just output the raw translated text."
 )
 
@@ -145,7 +143,7 @@ def _build_payload(chunk: str, level: str, tgt_lang: str) -> dict:
         config = LEVEL_CONFIGS.get(level) or {"temperature": 0.5, "top_p": 0.9}
     else:
         config = {"temperature": 0.5, "top_p": 0.9}
-    return {
+    payload = {
         "model": MODEL,
         "max_tokens": max(60, int(len(chunk.split()) * 4)),
         "temperature": config["temperature"],
@@ -155,6 +153,10 @@ def _build_payload(chunk: str, level: str, tgt_lang: str) -> dict:
             {"role": "user", "content": chunk},
         ],
     }
+    # Enable reasoning for models that support it (e.g., Gemma)
+    if "gemma" in MODEL.lower():
+        payload["reasoning"] = {"enabled": True}
+    return payload
 
 
 def _strip_reasoning(text: str) -> str:
