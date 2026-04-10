@@ -16,8 +16,9 @@ MODEL = os.getenv("TRANSLATION_MODEL", "nvidia/nemotron-3-super-120b-a12b:free")
 
 SYSTEM_PROMPT = (
     "You are a professional translator. Reply ONLY with the translated text. "
-    "Follow exact style in user prompt (simple/basic vs fluent/natural). "
-    "Do not add explanations, titles, or extra text."
+    "Do not add ANY explanations, analysis, thinking, reasoning, titles, "
+    "or extra text. Do not include phrases like 'The translation is:' or "
+    "'Here is the translation:'. Output ONLY the translated text."
 )
 
 MAX_CHARS_PER_REQUEST = 1500  # safety margin vs LLM context length
@@ -51,8 +52,12 @@ def _build_prompt(text: str, src: str, tgt: str, level: str = "") -> str:
     if tgt == "de" and level:
         config = LEVEL_CONFIGS.get(level, {})
         style = config.get("style", f"({level})")
-        return f"Translate from {src} to German using {style}:\n\n{text}"
-    return f"Translate from {src} to {tgt}:\n\n" + text
+        return (
+            f"Source: {src}\nTarget: {tgt}\nLevel: {style}\n"
+            f"Text: {text}\n"
+            f"Translation:"
+        )
+    return f"Source: {src}\nTarget: {tgt}\n" f"Text: {text}\n" f"Translation:"
 
 
 def _split_into_chunks(text: str, max_chars: int = MAX_CHARS_PER_REQUEST):
@@ -125,7 +130,12 @@ def translate_chunk_sync(
                 continue
             llm_resp.raise_for_status()
             data = llm_resp.json()
-            return data["choices"][0]["message"]["content"].strip()
+            raw = data["choices"][0]["message"]["content"].strip()
+            # Strip chain-of-thought / reasoning blocks if present
+            # Some models output <thinking>...</thinking> or "Reasoning:" blocks
+            # Keep only the final translated text
+            cleaned = _strip_reasoning(raw)
+            return cleaned
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 429 and retries < 3:
                 retries += 1
@@ -148,3 +158,62 @@ def translate_chunk_sync(
             raise RuntimeError(
                 "Upstream translation service unavailable. Please try later."
             )
+
+
+def _strip_reasoning(text: str) -> str:
+    """Remove chain-of-thought / reasoning blocks from LLM output.
+
+    Some models emit internal reasoning before the actual answer.
+    We strip known patterns to return only the final translation.
+    """
+    # Remove XML-style reasoning/thinking blocks
+    text = re.sub(r"<[^>]+>.*?</[^>]+>", "", text, flags=re.DOTALL).strip()
+
+    # Remove markdown code blocks
+    text = re.sub(r"```.*?```", "", text, flags=re.DOTALL).strip()
+
+    # Split into paragraphs - reasoning is usually the first paragraph(s)
+    paragraphs = text.split("\n\n")
+
+    # If there are multiple paragraphs, the translation is likely the last one
+    # (reasoning comes first, translation last)
+    if len(paragraphs) > 2:
+        # Check if first paragraphs contain reasoning markers
+        reasoning_in_first = any(
+            m in paragraphs[0].lower()
+            for m in [
+                "we need to",
+                "i need to",
+                "the user says",
+                "they want",
+                "they didn't",
+                "the text",
+                "translate from",
+                "let me",
+                "first,",
+                "to translate",
+                "probably",
+            ]
+        )
+        if reasoning_in_first:
+            # Take the last paragraph as the actual translation
+            text = paragraphs[-1].strip()
+
+    # Remove trailing analysis/notes
+    trailing_markers = [
+        "\n\nthe translation",
+        "\n\nnote:",
+        "\n\nexplanation:",
+        "\n\nthis translation",
+        "\n\nin this",
+        "\n\nthe above",
+        "\n---\n",
+        "\n\n---\n\n",
+    ]
+    for marker in trailing_markers:
+        idx = text.lower().find(marker)
+        if idx != -1:
+            text = text[:idx].strip()
+            break
+
+    return text.strip()
