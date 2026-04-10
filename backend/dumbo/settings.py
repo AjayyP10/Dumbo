@@ -235,3 +235,12 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000  # 1 year
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+
+# ── httpOnly JWT Cookie settings ───────────────────────────────────
+# Cookies are set by the backend on login/OAuth and automatically sent
+# by the browser on every request.  The SPA never sees the raw tokens,
+# so XSS attacks cannot steal them.
+JWT_AUTH_COOKIE = "access_token"
+JWT_REFRESH_AUTH_COOKIE = "refresh_token"
+JWT_COOKIE_SAMESITE = "None" if not DEBUG else "Lax"
+JWT_COOKIE_SECURE = not DEBUG

@@ -4,6 +4,12 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
 )
 
+from .cookie_auth import (
+    CookieLoginView,
+    CookieLogoutView,
+    CookieMeView,
+    CookieRefreshView,
+)
 from .throttles import LoginAnonRateThrottle
 from .views import (
     DeleteAccountView,
@@ -12,7 +18,6 @@ from .views import (
     HealthCheckView,
     HistoryListView,
     LoginLogListView,
-    LogoutView,
     OAuthErrorView,
     RegisterView,
     TaskStatusView,
@@ -34,21 +39,27 @@ class ThrottledRegisterView(RegisterView):
 
 
 urlpatterns = [
+    # ── Health ──────────────────────────────────────────────────────
     path("health/", HealthCheckView.as_view(), name="health"),
+    # ── Cookie-based auth (httpOnly JWT cookies) ────────────────────
+    path("auth/login/", CookieLoginView.as_view(), name="auth_login"),
+    path("auth/refresh/", CookieRefreshView.as_view(), name="auth_refresh"),
+    path("auth/logout/", CookieLogoutView.as_view(), name="auth_logout"),
+    path("auth/me/", CookieMeView.as_view(), name="auth_me"),
+    # ── Legacy JSON-token auth (kept for backward compatibility) ────
     path("oauth/", include("social_django.urls", namespace="social")),
-    # After social-auth processes the callback it will redirect here to issue JWT tokens
     path(
         "oauth/google/jwt/", GoogleAuthComplete.as_view(), name="google_auth_complete"
     ),
     path("token/", ThrottledTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    # ── API endpoints ───────────────────────────────────────────────
     path("translate/", TranslateView.as_view(), name="translate"),
     path("history/", HistoryListView.as_view(), name="history"),
     path("register/", ThrottledRegisterView.as_view(), name="register"),
     path("login-logs/", LoginLogListView.as_view(), name="login_logs"),
     path("profile/", UserProfileView.as_view(), name="profile"),
     path("delete-account/", DeleteAccountView.as_view(), name="delete_account"),
-    path("logout/", LogoutView.as_view(), name="logout"),
     path("export-history/", ExportHistoryView.as_view(), name="export_history"),
     path("oauth/error/", OAuthErrorView.as_view(), name="oauth_error"),
     path("tasks/<uuid:task_id>/", TaskStatusView.as_view(), name="task_status"),

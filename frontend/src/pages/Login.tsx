@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api } from "../api";
-import { saveTokens } from "../auth";
+import { setAuthActive, setUsername as storeUsername } from "../auth";
 import { useNavigate, Link } from "react-router-dom";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -16,12 +16,9 @@ export default function Login() {
     setIsLoading(true);
     setError("");
     try {
-      const res = await api.post<{ access: string; refresh: string }>(
-        "token/",
-        data,
-      );
-      saveTokens(res.data.access, res.data.refresh);
-      localStorage.setItem("username", data.username);
+      await api.post("auth/login/", data);
+      setAuthActive(true);
+      storeUsername(data.username);
       navigate("/translate");
     } catch {
       setError("Invalid credentials");
@@ -32,25 +29,8 @@ export default function Login() {
 
   const handleGoogleLogin = async (e: React.MouseEvent) => {
     e.preventDefault();
-    // Clear any client-side cached username and server-side session to avoid
-    // leaking the previous Google account's profile when switching users.
     localStorage.removeItem("username");
-    // Proactively clear any social-auth cookies that Django may have set
-    document.cookie.split(";").forEach((c) => {
-      const [name] = c.trim().split("=");
-      if (name.startsWith("social-auth")) {
-        document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
-      }
-    });
-    try {
-      await fetch(`${API_URL}/api/logout/`, {
-        method: "POST",
-        credentials: "include",
-      });
-    } catch (_) {
-      /* network errors can be ignored – we clear localStorage anyway */
-    }
-    // After ensuring server-side logout, redirect to Google OAuth login
+    setAuthActive(false);
     window.location.href = `${API_URL}/api/oauth/login/google-oauth2/?prompt=select_account`;
   };
 

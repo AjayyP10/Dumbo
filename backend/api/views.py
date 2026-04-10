@@ -6,8 +6,6 @@ from celery.result import AsyncResult
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.http import HttpResponse, HttpResponseRedirect
-from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import csrf_exempt
 from rest_framework import generics, permissions
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.response import Response
@@ -34,13 +32,6 @@ from .translation_engine import (
     _split_into_chunks,
     translate_chunk_sync,
 )
-
-# Custom auth class to allow CSRF-exempt session-based requests (e.g., /api/logout/)
-
-
-class CsrfExemptSessionAuthentication(SessionAuthentication):
-    def enforce_csrf(self, request):
-        return  # Skip CSRF; view stays @csrf_exempt
 
 
 class TranslateView(APIView):
@@ -311,52 +302,52 @@ class GoogleAuthComplete(APIView):
     """Custom view that is called after Google OAuth completes.
 
     Expects the user to be authenticated in the session by social-auth-app-django.
-    Issues a pair of JWT tokens so the SPA can authenticate subsequent requests.
+    Sets httpOnly JWT cookies and redirects to the frontend — **no tokens in URL**.
     """
 
     authentication_classes = [SessionAuthentication]
-    # We will perform a redirect instead of JSON, so no renderer needed
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
         if not request.user or not request.user.is_authenticated:
             return Response({"error": "Authentication failed"}, status=401)
 
+        from django.conf import settings
+
         refresh = RefreshToken.for_user(request.user)
-        # Include the user's email in both refresh & access tokens so the SPA can
-        # greet the user without an extra API call.
         email = request.user.email or request.user.get_username()
         refresh["email"] = email
         refresh.access_token["email"] = email
 
-        # Build redirect URL to frontend, embedding tokens in URL fragment so
-        # they are never sent to the server via HTTP referer or logs.
-        frontend_base = os.getenv("FRONTEND_URL", "http://localhost:5173")
-        redirect_url = (
-            f"{frontend_base}/oauth-complete#access={str(refresh.access_token)}"
-            f"&refresh={str(refresh)}"
+        cookie_name = getattr(settings, "JWT_AUTH_COOKIE", "access_token")
+        refresh_name = getattr(settings, "JWT_REFRESH_AUTH_COOKIE", "refresh_token")
+        same_site = getattr(settings, "JWT_COOKIE_SAMESITE", "Lax")
+        secure = getattr(settings, "JWT_COOKIE_SECURE", True)
+
+        response = HttpResponseRedirect(
+            os.getenv("FRONTEND_URL", "http://localhost:5173") + "/oauth-complete"
         )
-        return HttpResponseRedirect(redirect_url)
-
-
-@method_decorator(csrf_exempt, name="dispatch")
-class LogoutView(APIView):
-    """Log out the current session (clears Django session cookies).
-
-    This endpoint allows the SPA to ensure the server-side session created by
-    social-auth is terminated when the user logs out or before switching
-    accounts. It is intentionally CSRF-exempt because it performs no state-
-    changing action beyond clearing the user’s own session.
-    """
-
-    permission_classes = [permissions.AllowAny]
-    authentication_classes = [CsrfExemptSessionAuthentication]
-
-    def post(self, request):
-        from django.contrib.auth import logout as django_logout
-
-        django_logout(request)
-        return Response({"detail": "Logged out."})
+        # Access cookie — 1 hour
+        response.set_cookie(
+            key=cookie_name,
+            value=str(refresh.access_token),
+            max_age=3600,
+            httponly=True,
+            secure=secure,
+            samesite=same_site,
+            path="/",
+        )
+        # Refresh cookie — 30 days
+        response.set_cookie(
+            key=refresh_name,
+            value=str(refresh),
+            max_age=30 * 24 * 3600,
+            httponly=True,
+            secure=secure,
+            samesite=same_site,
+            path="/",
+        )
+        return response
 
 
 class DeleteAccountView(APIView):

@@ -1,43 +1,32 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { saveTokens } from "../auth";
+import { setAuthActive, setUsername as storeUsername } from "../auth";
 import { api } from "../api";
 
-// This page is loaded after the backend redirects the user back to the SPA with
-// JWT tokens in the URL hash. It extracts the tokens, stores them, and then
-// seamlessly redirects the user to the main translation view.
+/**
+ * Landing page after Google OAuth redirect.
+ *
+ * The backend has already set httpOnly JWT cookies during the OAuth
+ * handshake, so we don't need to read any tokens from the URL.  We simply
+ * verify that we are authenticated (GET /api/profile/) and navigate.
+ */
 export default function OAuthComplete() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchProfile = async () => {
+    const handle = async () => {
       try {
         const res = await api.get<{ display_name: string | null }>("profile/");
-        return res.data.display_name;
-      } catch {
-        return null;
-      }
-    };
-    const handle = async () => {
-      // Example hash: #access=AAA&refresh=BBB
-      const hash = window.location.hash.replace(/^#/, "");
-      const params = new URLSearchParams(hash);
-      const access = params.get("access");
-      const refresh = params.get("refresh");
-
-      if (access && refresh) {
-        // Clear any previously stored username in case a different user logs in
-        localStorage.removeItem("username");
-        saveTokens(access, refresh);
-        const display = await fetchProfile();
-        if (display) {
-          localStorage.setItem("username", display);
+        const displayName = res.data.display_name;
+        setAuthActive(true);
+        if (displayName) {
+          storeUsername(displayName);
           navigate("/translate", { replace: true });
         } else {
           navigate("/welcome", { replace: true });
         }
-      } else {
-        // Missing tokens – redirect to login
+      } catch {
+        // Not authenticated — something went wrong with OAuth
         navigate("/login", { replace: true });
       }
     };
@@ -45,5 +34,5 @@ export default function OAuthComplete() {
     handle();
   }, [navigate]);
 
-  return null; // Nothing to render – immediate redirect handled above
+  return null;
 }
