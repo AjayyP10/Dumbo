@@ -40,7 +40,11 @@ class UserProfile(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return self.display_name or self.user.get_username() or "(no name)"
+        try:
+            username = self.user.get_username() if self.user_id else "(no user)"
+        except Exception:
+            username = "(deleted user)"
+        return self.display_name or username or "(no name)"
 
 
 class UserLoginLog(models.Model):

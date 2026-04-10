@@ -133,6 +133,7 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "user": os.getenv("THROTTLE_RATE_USER", "100/min"),
         "anon": os.getenv("THROTTLE_RATE_ANON", "50/min"),
+        "login": os.getenv("THROTTLE_RATE_LOGIN", "20/min"),
     },
 }
 

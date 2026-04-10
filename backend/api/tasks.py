@@ -71,7 +71,10 @@ def translate_text_task(
         resp = await client.post(OPENROUTER_URL, json=payload, headers=headers)
         resp.raise_for_status()
         data = resp.json()
-        return data["choices"][0]["message"]["content"].strip()
+        try:
+            return data["choices"][0]["message"]["content"].strip()
+        except (KeyError, IndexError) as e:
+            raise RuntimeError(f"Unexpected LLM response format: {e}") from e
 
     async def _run_async():
         async with httpx.AsyncClient(timeout=30, limits=limits) as client:

@@ -83,6 +83,20 @@ class TranslateView(APIView):
         target_lang = request.data.get("target_lang", "de")
         level = request.data.get("level", "")  # optional now
 
+        # --- Input validation ---
+        if not text:
+            return Response({"error": "input_text must not be empty"}, status=400)
+
+        MAX_INPUT_CHARS = int(os.getenv("MAX_INPUT_CHARS", "10000"))
+        if len(text) > MAX_INPUT_CHARS:
+            return Response(
+                {
+                    "error": f"input_text exceeds maximum length of {MAX_INPUT_CHARS} "
+                    f"characters (got {len(text)})."
+                },
+                status=400,
+            )
+
         # Validate languages
         allowed_langs = [code for code, _ in Translation.LANG_CHOICES]
         if source_lang not in allowed_langs or target_lang not in allowed_langs:
@@ -100,9 +114,11 @@ class TranslateView(APIView):
         cache_key = make_cache_key(text, source_lang, target_lang, level)
 
         # --- Optionally offload long or explicitly async requests to Celery ---
-        if request.query_params.get("async") == "1" or len(text) > int(
-            os.getenv("ASYNC_TRANSLATE_THRESHOLD", 3000)
-        ):
+        try:
+            async_threshold = int(os.getenv("ASYNC_TRANSLATE_THRESHOLD", "3000"))
+        except (ValueError, TypeError):
+            async_threshold = 3000
+        if request.query_params.get("async") == "1" or len(text) > async_threshold:
             from .tasks import translate_text_task
 
             task = translate_text_task.delay(
@@ -354,14 +370,9 @@ class DeleteAccountView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def delete(self, request):
-        # Keep a reference to the user before deleting for potential auditing
         user = request.user
-        username = user.username
         user.delete()
-        # If we reach here, deletion succeeded
-        return Response(
-            {"detail": f"User '{username}' and related data deleted."}, status=204
-        )
+        return Response(status=204)
 
 
 class OAuthErrorView(APIView):
@@ -431,11 +442,7 @@ class TaskStatusView(APIView):
             return value.isoformat()
         # Fallback: treat as epoch seconds
         try:
-            return (
-                datetime.utcfromtimestamp(float(value))
-                .replace(tzinfo=timezone.utc)
-                .isoformat()
-            )
+            return datetime.fromtimestamp(float(value), tz=timezone.utc).isoformat()
         except Exception:
             return None
 

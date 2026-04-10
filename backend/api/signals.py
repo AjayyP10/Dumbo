@@ -38,10 +38,9 @@ def log_successful_login(sender, request, user, **kwargs):
 
 
 @receiver(user_login_failed)
-def log_failed_login(sender, credentials, request, **kwargs):
+def log_failed_login(sender, credentials, request=None, **kwargs):
     username = credentials.get("username")
     user = None
-    # Try to look up user object (optional—surround with try/except in case)
     from django.contrib.auth import get_user_model
 
     try:
@@ -49,7 +48,10 @@ def log_failed_login(sender, credentials, request, **kwargs):
     except Exception:
         pass
 
-    ip, ua = _get_request_meta(request)
+    if request is not None:
+        ip, ua = _get_request_meta(request)
+    else:
+        ip, ua = None, ""
     UserLoginLog.objects.create(
         user=user,
         ip_address=ip,

@@ -4,6 +4,7 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
 )
 
+from .throttles import LoginAnonRateThrottle
 from .views import (
     DeleteAccountView,
     ExportHistoryView,
@@ -19,6 +20,19 @@ from .views import (
     UserProfileView,
 )
 
+
+class ThrottledTokenObtainPairView(TokenObtainPairView):
+    """Token endpoint with login brute-force protection."""
+
+    throttle_classes = [LoginAnonRateThrottle]
+
+
+class ThrottledRegisterView(RegisterView):
+    """Registration endpoint with brute-force protection."""
+
+    throttle_classes = [LoginAnonRateThrottle]
+
+
 urlpatterns = [
     path("health/", HealthCheckView.as_view(), name="health"),
     path("oauth/", include("social_django.urls", namespace="social")),
@@ -26,11 +40,11 @@ urlpatterns = [
     path(
         "oauth/google/jwt/", GoogleAuthComplete.as_view(), name="google_auth_complete"
     ),
-    path("token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("token/", ThrottledTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("translate/", TranslateView.as_view(), name="translate"),
     path("history/", HistoryListView.as_view(), name="history"),
-    path("register/", RegisterView.as_view(), name="register"),
+    path("register/", ThrottledRegisterView.as_view(), name="register"),
     path("login-logs/", LoginLogListView.as_view(), name="login_logs"),
     path("profile/", UserProfileView.as_view(), name="profile"),
     path("delete-account/", DeleteAccountView.as_view(), name="delete_account"),
