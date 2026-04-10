@@ -6,7 +6,7 @@ services:
     region: frankfurt
     plan: free
     buildCommand: bash build.sh
-    startCommand: python -m gunicorn backend.dumbo.wsgi:application --bind 0.0.0.0:$PORT
+    startCommand: python backend/manage.py migrate --noinput && python -m gunicorn backend.dumbo.wsgi:application --bind 0.0.0.0:$PORT
     healthCheckPath: /api/health/
     envVars:
       - key: DATABASE_URL
@@ -43,7 +43,7 @@ services:
     region: frankfurt
     plan: free
     buildCommand: bash build.sh
-    startCommand: celery -A backend.dumbo worker --loglevel=info --pool=solo
+    startCommand: python backend/manage.py migrate --noinput && celery -A backend.dumbo worker --loglevel=info --pool=solo
     envVars:
       - key: DATABASE_URL
         fromDatabase:
