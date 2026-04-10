@@ -15,10 +15,11 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 MODEL = os.getenv("TRANSLATION_MODEL", "nvidia/nemotron-3-super-120b-a12b:free")
 
 SYSTEM_PROMPT = (
-    "You are a professional translator. Reply ONLY with the translated text. "
-    "Do not add ANY explanations, analysis, thinking, reasoning, titles, "
-    "or extra text. Do not include phrases like 'The translation is:' or "
-    "'Here is the translation:'. Output ONLY the translated text."
+    "You are a professional translator. Output ONLY the translated text. "
+    "Never explain, analyze, think out loud, or provide alternatives. "
+    "Never say 'We need to translate' or similar phrases. "
+    "Never use quotes around the translation. "
+    "Just output the raw translated text."
 )
 
 MAX_CHARS_PER_REQUEST = 1500  # safety margin vs LLM context length
@@ -163,57 +164,122 @@ def translate_chunk_sync(
 def _strip_reasoning(text: str) -> str:
     """Remove chain-of-thought / reasoning blocks from LLM output.
 
-    Some models emit internal reasoning before the actual answer.
-    We strip known patterns to return only the final translation.
+    Aggressively extracts only the actual translation text.
+    Handles patterns like:
+    - "We need to translate... Provide translation: "German text" Or "Alt German""
+    - Reasoning paragraphs followed by the actual translation
     """
-    # Remove XML-style reasoning/thinking blocks
-    text = re.sub(r"<[^>]+>.*?</[^>]+>", "", text, flags=re.DOTALL).strip()
+    if not text:
+        return text
 
-    # Remove markdown code blocks
-    text = re.sub(r"```.*?```", "", text, flags=re.DOTALL).strip()
+    # Strategy 1: Find all quoted German text and pick the best one
+    # Matches text in quotes that contains German words/patterns
+    all_quotes = re.findall(r'[""]([^""\n]{5,})[""]', text)
 
-    # Split into paragraphs - reasoning is usually the first paragraph(s)
-    paragraphs = text.split("\n\n")
-
-    # If there are multiple paragraphs, the translation is likely the last one
-    # (reasoning comes first, translation last)
-    if len(paragraphs) > 2:
-        # Check if first paragraphs contain reasoning markers
-        reasoning_in_first = any(
-            m in paragraphs[0].lower()
-            for m in [
-                "we need to",
-                "i need to",
-                "the user says",
-                "they want",
-                "they didn't",
-                "the text",
-                "translate from",
-                "let me",
-                "first,",
-                "to translate",
-                "probably",
-            ]
-        )
-        if reasoning_in_first:
-            # Take the last paragraph as the actual translation
-            text = paragraphs[-1].strip()
-
-    # Remove trailing analysis/notes
-    trailing_markers = [
-        "\n\nthe translation",
-        "\n\nnote:",
-        "\n\nexplanation:",
-        "\n\nthis translation",
-        "\n\nin this",
-        "\n\nthe above",
-        "\n---\n",
-        "\n\n---\n\n",
+    german_markers = [
+        "gehen",
+        "zum",
+        "und",
+        "ich",
+        "das",
+        "der",
+        "die",
+        "ist",
+        "haben",
+        "werden",
+        "können",
+        "müssen",
+        "sollen",
+        "wollen",
+        "mögen",
+        "dürfen",
+        "nicht",
+        "auch",
+        "noch",
+        "aber",
+        "denn",
+        "weil",
+        "dass",
+        "wenn",
+        "Hallo",
+        "Guten",
+        "Bitte",
+        "Danke",
+        "Ja",
+        "Nein",
+        "Deutsch",
+        "klasse",
+        "kurs",
+        "unterricht",
+        "lass",
+        "uns",
     ]
-    for marker in trailing_markers:
-        idx = text.lower().find(marker)
+
+    def is_german(text_snippet: str) -> bool:
+        lower = text_snippet.lower()
+        # Has German-specific characters
+        if any(c in text_snippet for c in "äöüß"):
+            return True
+        # Contains German words
+        return any(marker in lower for marker in german_markers)
+
+    # Filter quotes to only those that look like German translations
+    german_quotes = [q for q in all_quotes if is_german(q)]
+
+    if german_quotes:
+        # Return the longest German-looking quote (usually the main translation)
+        best = max(german_quotes, key=len)
+        return best.strip()
+
+    # Strategy 2: Look for "Provide translation:" or similar indicators
+    for indicator in ["provide translation:", "translation:", "german:", "deutsch:"]:
+        idx = text.lower().find(indicator)
         if idx != -1:
-            text = text[:idx].strip()
-            break
+            after = text[idx + len(indicator) :].strip()
+            # Get first quoted text after indicator
+            quotes_after = re.findall(r'[""]([^""\n]{5,})[""]', after)
+            for q in quotes_after:
+                if is_german(q):
+                    return q.strip()
+            # If no quotes, take first sentence
+            first_sent = re.split(r"[.!?\n]", after)[0].strip()
+            if first_sent and len(first_sent) > 5:
+                return first_sent
+
+    # Strategy 3: If text starts with reasoning, extract quoted German text anywhere
+    reasoning_starters = [
+        "we need to",
+        "the user",
+        "they want",
+        "let me",
+        "i need to",
+        "first,",
+        "to translate",
+        "the source text",
+        "the sentence",
+        "the text",
+        "the phrase",
+    ]
+    if any(text.lower().startswith(s) for s in reasoning_starters):
+        if german_quotes:
+            return german_quotes[0].strip()
+        # Try to find any substantial German text (not just in quotes)
+        sentences = re.split(r"[.!?\n]+", text)
+        for sent in reversed(sentences):
+            sent = sent.strip().strip("\"' ")
+            if len(sent) > 10 and is_german(sent):
+                return sent
+
+    # Strategy 4: Fallback - if text is reasonably short, return as-is
+    if len(text) < 150:
+        return text.strip()
+
+    # Strategy 5: Take the last sentence that looks like German
+    sentences = [
+        s.strip().strip("\"' ") for s in re.split(r"[.!?\n]+", text) if s.strip()
+    ]
+    for sent in reversed(sentences):
+        if len(sent) > 5 and is_german(sent):
+            return sent
 
     return text.strip()
