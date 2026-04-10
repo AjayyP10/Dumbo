@@ -370,8 +370,26 @@ class OAuthErrorView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
+        import logging
+
+        logger = logging.getLogger(__name__)
+
         message = request.GET.get("message", "OAuth error")
-        return Response({"error": message}, status=400)
+        exception = request.GET.get("exception", "")
+        code = request.GET.get("code", "")
+
+        logger.error(
+            "OAuth error: message=%s, exception=%s, code=%s", message, exception, code
+        )
+
+        return Response(
+            {
+                "error": message,
+                "exception": exception,
+                "code": code,
+            },
+            status=400,
+        )
 
 
 class TaskStatusView(APIView):
